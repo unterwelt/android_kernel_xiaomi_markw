@@ -1075,6 +1075,7 @@ typedef struct tagCsrRoamStruct
 #endif
     tANI_U32 deauthRspStatus;
     tANI_BOOLEAN pending_roam_disable;
+    vos_spin_lock_t roam_state_lock;
 }tCsrRoamStruct;
 
 

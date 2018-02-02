@@ -757,6 +757,7 @@ typedef struct
   s16 rssi_sample_sum;
   uint8_t rssi_sample_cnt;
   uint8_t rssi_stale_idx;
+  uint16_t rate_idx;
 }WLANTL_STAClientType;
 
 /*---------------------------------------------------------------------------
