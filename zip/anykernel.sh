@@ -4,16 +4,16 @@
 ## AnyKernel setup
 # begin properties
 properties() {
-kernel.string=Revolt By NATO66613
+kernel.string=VaBe
 do.devicecheck=1
 do.modules=0
 do.cleanup=1
 do.cleanuponabort=0
-device.name1=mido
-device.name2=redmi note 4
-device.name3=redminote4
-device.name4=Redmi Note 4
-device.name5=Xiaomi Redmi Note 4
+device.name1=markw
+device.name2=redmi 4 Prime
+device.name3=r4p
+device.name4=Redmi Prime 4
+device.name5=Xiaomi Redmi Prime 4
 } # end properties
 
 # shell variables
