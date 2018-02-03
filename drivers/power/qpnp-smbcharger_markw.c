@@ -5409,7 +5409,7 @@ static void smbchg_handle_hvdcp3_disable(struct smbchg_chip *chip)
 			}
 		}
 	} else {
-		smbchg_change_usb_supply_type(chip, POWER_SUPPLY_TYPE_UNKNOWN);
+		smbchg_change_usb_supply_type(chip, POWER_SUPPLY_TYPE_USB);
 	}
 }
 
