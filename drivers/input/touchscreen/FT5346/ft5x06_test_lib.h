@@ -9,6 +9,10 @@
 #define false 0
 #define true  1
 
+#if (defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE) || defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)) 
+extern bool gesture_incall; 
+#endif 
+
 typedef int (*FTS_I2c_Read_Function)(unsigned char * , int , unsigned char *, int);
 typedef int (*FTS_I2c_Write_Function)(unsigned char * , int);
 
