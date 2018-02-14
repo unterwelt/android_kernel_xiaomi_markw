@@ -56,8 +56,6 @@
 #include "mdss_mdp.h"
 #include "mdp3_ctrl.h"
 
-#include "mdss_livedisplay.h"
-
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
 #else
@@ -302,14 +300,17 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
 
-	if (backlight_dimmer) { 
-    MDSS_BRIGHT_TO_BL_DIMMER(bl_lvl, value); 
-  } else { 
-    /* This maps android backlight level 0 to 255 into 
-       driver backlight level 0 to bl_max with rounding */ 
-    MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max, 
-          mfd->panel_info->brightness_max); 
-  } 
+			if (backlight_dimmer) {
+				if (value < 3)
+					bl_lvl = 1;
+				else
+					MDSS_BRIGHT_TO_BL_DIMMER(bl_lvl, value);
+			} else {
+				/* This maps android backlight level 0 to 255 into
+				   driver backlight level 0 to bl_max with rounding */
+				MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
+							mfd->panel_info->brightness_max);
+			}
 
 	if (!bl_lvl && value)
 		bl_lvl = 1;
@@ -947,8 +948,7 @@ static int mdss_fb_create_sysfs(struct msm_fb_data_type *mfd)
 	rc = sysfs_create_group(&mfd->fbi->dev->kobj, &mdss_fb_attr_group);
 	if (rc)
 		pr_err("sysfs group creation failed, rc=%d\n", rc);
-
-	return mdss_livedisplay_create_sysfs(mfd);
+	return rc;
 }
 
 static void mdss_fb_remove_sysfs(struct msm_fb_data_type *mfd)

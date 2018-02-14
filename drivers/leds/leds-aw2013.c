@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
 #include <linux/leds-aw2013.h>
+#include <linux/of_gpio.h>
 
 /* register address */
 #define AW_REG_RESET			0x00
@@ -93,11 +94,13 @@ static int aw2013_power_on(struct aw2013_led *led, bool on)
 			return rc;
 		}
 
-		rc = regulator_enable(led->vcc);
-		if (rc) {
-			dev_err(&led->client->dev,
-				"Regulator vcc enable failed rc=%d\n", rc);
-			goto fail_enable_reg;
+		if (led->pdata->awgpio <= 0)  {
+			rc = regulator_enable(led->vcc);
+			if (rc) {
+				dev_err(&led->client->dev,
+						"Regulator vcc enable failed rc=%d\n", rc);
+				goto fail_enable_reg;
+			}
 		}
 		led->poweron = true;
 	} else {
@@ -108,11 +111,13 @@ static int aw2013_power_on(struct aw2013_led *led, bool on)
 			return rc;
 		}
 
-		rc = regulator_disable(led->vcc);
-		if (rc) {
-			dev_err(&led->client->dev,
-				"Regulator vcc disable failed rc=%d\n", rc);
-			goto fail_disable_reg;
+		if (led->pdata->awgpio <= 0)  {
+			rc = regulator_disable(led->vcc);
+			if (rc) {
+				dev_err(&led->client->dev,
+						"Regulator vcc disable failed rc=%d\n", rc);
+				goto fail_disable_reg;
+			}
 		}
 		led->poweron = false;
 	}
@@ -159,21 +164,26 @@ static int aw2013_power_init(struct aw2013_led *led, bool on)
 			}
 		}
 
-		led->vcc = regulator_get(&led->client->dev, "vcc");
-		if (IS_ERR(led->vcc)) {
-			rc = PTR_ERR(led->vcc);
-			dev_err(&led->client->dev,
-				"Regulator get failed vcc rc=%d\n", rc);
-			goto reg_vdd_set_vtg;
-		}
-
-		if (regulator_count_voltages(led->vcc) > 0) {
-			rc = regulator_set_voltage(led->vcc, AW2013_VI2C_MIN_UV,
-						   AW2013_VI2C_MAX_UV);
-			if (rc) {
+		if (led->pdata->awgpio > 0) {
+			gpio_request(led->pdata->awgpio, "aw2013-gpio");
+			gpio_direction_output(led->pdata->awgpio, 1);
+		} else {
+			led->vcc = regulator_get(&led->client->dev, "vcc");
+			if (IS_ERR(led->vcc)) {
+				rc = PTR_ERR(led->vcc);
 				dev_err(&led->client->dev,
-				"Regulator set_vtg failed vcc rc=%d\n", rc);
-				goto reg_vcc_put;
+						"Regulator get failed vcc rc=%d\n", rc);
+				goto reg_vdd_set_vtg;
+			}
+
+			if (regulator_count_voltages(led->vcc) > 0) {
+				rc = regulator_set_voltage(led->vcc, AW2013_VI2C_MIN_UV,
+						AW2013_VI2C_MAX_UV);
+				if (rc) {
+					dev_err(&led->client->dev,
+							"Regulator set_vtg failed vcc rc=%d\n", rc);
+					goto reg_vcc_put;
+				}
 			}
 		}
 	} else {
@@ -182,10 +192,12 @@ static int aw2013_power_init(struct aw2013_led *led, bool on)
 
 		regulator_put(led->vdd);
 
-		if (regulator_count_voltages(led->vcc) > 0)
-			regulator_set_voltage(led->vcc, 0, AW2013_VI2C_MAX_UV);
+		if (!led->pdata->awgpio <= 0) {
+			if (regulator_count_voltages(led->vcc) > 0)
+				regulator_set_voltage(led->vcc, 0, AW2013_VI2C_MAX_UV);
 
-		regulator_put(led->vcc);
+			regulator_put(led->vcc);
+		}
 	}
 	return 0;
 
@@ -385,7 +397,7 @@ static int aw_2013_check_chipid(struct aw2013_led *led)
 	u8 val;
 
 	aw2013_write(led, AW_REG_RESET, AW_LED_RESET_MASK);
-	usleep_range(AW_LED_RESET_DELAY, AW_LED_RESET_DELAY+100);
+	udelay(AW_LED_RESET_DELAY);
 	aw2013_read(led, AW_REG_RESET, &val);
 	if (val == AW2013_CHIPID)
 		return 0;
@@ -466,6 +478,12 @@ static int aw2013_led_parse_child_node(struct aw2013_led *led_array,
 			dev_err(&led->client->dev,
 				"Failure reading max-current, rc = %d\n", rc);
 			goto free_pdata;
+		}
+
+		rc = of_property_read_u32(temp, "aw2013,gpio",
+			&led->pdata->awgpio);
+		if (rc < 0) {
+			led->pdata->awgpio = 0;
 		}
 
 		rc = of_property_read_u32(temp, "aw2013,rise-time-ms",
@@ -654,4 +672,3 @@ module_exit(aw2013_led_exit);
 
 MODULE_DESCRIPTION("AWINIC aw2013 LED driver");
 MODULE_LICENSE("GPL v2");
-
