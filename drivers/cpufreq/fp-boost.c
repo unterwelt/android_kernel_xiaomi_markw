@@ -434,7 +434,7 @@ static int __init cpu_fp_init(void)
 
 	cpufreq_register_notifier(&do_cpu_boost_nb, CPUFREQ_POLICY_NOTIFIER);
 
-        fb_register_client(&fb_notifier_callback_nb);
+        set_boost_bit(b, DRIVER_ENABLED); 
 
 	return 0;
 
