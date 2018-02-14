@@ -1,3 +1,4 @@
+/*
 
  * linux/include/linux/cpufreq.h
  *
