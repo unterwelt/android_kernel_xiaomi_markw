@@ -550,13 +550,13 @@ firmware: firmware {
 
 		qcom,vdd-gfx-rstr {
 			qcom,vdd-rstr-reg = "vdd-gfx";
-			qcom,levels = <5 8 8>; /* Nominal, Turbo, Turbo */
+			qcom,levels = <5 7 8>; /* Nominal, Turbo, Turbo */
 			qcom,min-level = <1>; /* No Request */
 		};
 
 		msm_thermal_freq: qcom,vdd-apps-rstr {
 			qcom,vdd-rstr-reg = "vdd-apps";
-			qcom,levels = <1689600>;
+			qcom,levels = <307000 1689600 2208000>;
 			qcom,freq-req;
 		};
 	};
