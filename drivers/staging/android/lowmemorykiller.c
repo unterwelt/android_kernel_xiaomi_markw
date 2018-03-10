@@ -1,4 +1,4 @@
-
+/*
  *
  * The lowmemorykiller driver lets user-space specify a set of memory thresholds
  * where processes with a range of oom_score_adj values will get killed. Specify
@@ -132,6 +132,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 						global_page_state(NR_SHMEM) -
 						global_page_state(NR_UNEVICTABLE) -
 						total_swapcache_pages();
+	int minfree_count_offset = 0;
 
 	rcu_read_lock();
 	tsk = current->group_leader;
@@ -280,7 +281,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		lmk_count++;
 	} else
 		rcu_read_unlock();
-	}
+
 	lowmem_print(4, "lowmem_scan %lu, %x, return %lu\n",
 		     sc->nr_to_scan, sc->gfp_mask, rem);
 	return rem;
