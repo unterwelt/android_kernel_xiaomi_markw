@@ -1,4 +1,4 @@
-/* drivers/misc/lowmemorykiller.c
+
  *
  * The lowmemorykiller driver lets user-space specify a set of memory thresholds
  * where processes with a range of oom_score_adj values will get killed. Specify
@@ -109,6 +109,12 @@ static int test_task_flag(struct task_struct *p, int flag)
 	return 0;
 }
 
+#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
+static struct task_struct *pick_next_from_adj_tree(struct task_struct *task);
+static struct task_struct *pick_first_task(void);
+static struct task_struct *pick_last_task(void);
+#endif
+
 static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 {
 	struct task_struct *tsk;
@@ -155,7 +161,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	rcu_read_lock();
 #ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
 	for (tsk = pick_first_task();
-		tsk != pick_last_task() && tsk != NULL;
+		tsk != pick_last_task();
 		tsk = pick_next_from_adj_tree(tsk)) {
 #else
 	for_each_process(tsk) {
@@ -268,9 +274,8 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 }
 
 #ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
-static DEFINE_SPINLOCK(lmk_lock);
-static struct rb_root tasks_scoreadj = RB_ROOT;
-
+DEFINE_SPINLOCK(lmk_lock);
+struct rb_root tasks_scoreadj = RB_ROOT;
 void add_2_adj_tree(struct task_struct *task)
 {
 	struct rb_node **link;
@@ -301,14 +306,11 @@ void add_2_adj_tree(struct task_struct *task)
 void delete_from_adj_tree(struct task_struct *task)
 {
 	spin_lock(&lmk_lock);
-	if (!RB_EMPTY_NODE(&task->adj_node)) {
-		rb_erase(&task->adj_node, &tasks_scoreadj);
-		RB_CLEAR_NODE(&task->adj_node);
-	}
+	rb_erase(&task->adj_node, &tasks_scoreadj);
 	spin_unlock(&lmk_lock);
 }
 
-static inline struct task_struct *pick_next_from_adj_tree(struct task_struct *task)
+static struct task_struct *pick_next_from_adj_tree(struct task_struct *task)
 {
 	struct rb_node *next;
 
@@ -322,7 +324,7 @@ static inline struct task_struct *pick_next_from_adj_tree(struct task_struct *ta
 	return rb_entry(next, struct task_struct, adj_node);
 }
 
-static inline struct task_struct *pick_first_task(void)
+static struct task_struct *pick_first_task(void)
 {
 	struct rb_node *left;
 
@@ -335,7 +337,7 @@ static inline struct task_struct *pick_first_task(void)
 
 	return rb_entry(left, struct task_struct, adj_node);
 }
-static inline struct task_struct *pick_last_task(void)
+static struct task_struct *pick_last_task(void)
 {
 	struct rb_node *right;
 
