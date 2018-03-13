@@ -382,12 +382,11 @@ static struct clk_freq_tbl ftbl_gfx3d_clk_src[] = {
 	F_MM( 216000000, FIXED_CLK_SRC, gpll6_main_div2_gfx,  2.5,    0,     0),
 	F_MM( 266670000, FIXED_CLK_SRC,               gpll0,    3,    0,     0),
 	F_MM( 320000000, FIXED_CLK_SRC,               gpll0,  2.5,    0,     0),
-	F_MM( 400000000, FIXED_CLK_SRC,               gpll0,    2,    0,     0),
-	F_MM( 460800000, FIXED_CLK_SRC,       gpll4_out_aux,  2.5,    0,     0),
-	F_MM( 510000000,    1020000000,               gpll3,    1,    0,     0),
-	F_MM( 560000000,    1120000000,               gpll3,    1,    0,     0),
-	F_MM( 650000000,    1300000000,               gpll3,    1,    0,     0),
- 	F_MM( 700000000,    1400000000,               gpll3,    1,    0,     0), 
+	F_MM( 358000000,     716000000,               gpll0,    2,    0,     0),
+	F_MM( 434000000,     868000000,       gpll4_out_aux,    1,    0,     0),
+	F_MM( 542000000,    1084000000,               gpll3,    1,    0,     0),
+	F_MM( 630000000,    1260000000,               gpll3,    1,    0,     0),
+ 	F_MM( 680000000,    1360000000,               gpll3,    1,    0,     0), 
 	F_END
 };
 
@@ -402,11 +401,11 @@ static struct clk_freq_tbl ftbl_gfx3d_clk_src_sdm450[] = {
 	F_MM( 216000000, FIXED_CLK_SRC, gpll6_main_div2_gfx,  2.5,    0,     0),
 	F_MM( 266670000, FIXED_CLK_SRC,               gpll0,    3,    0,     0),
 	F_MM( 320000000, FIXED_CLK_SRC,               gpll0,  2.5,    0,     0),
-	F_MM( 400000000, FIXED_CLK_SRC,               gpll0,    2,    0,     0),
-	F_MM( 460800000, FIXED_CLK_SRC,       gpll4_out_aux,  2.5,    0,     0),
-	F_MM( 510000000,    1020000000,               gpll3,    1,    0,     0),
-	F_MM( 560000000,    1120000000,               gpll3,    1,    0,     0),
-	F_MM( 600000000,    1200000000,               gpll3,    1,    0,     0),
+	F_MM( 358000000,     716000000,               gpll0,    2,    0,     0),
+	F_MM( 434000000,     868000000,       gpll4_out_aux,    1,    0,     0),
+	F_MM( 542000000,    1084000000,               gpll3,    1,    0,     0),
+	F_MM( 630000000,    1260000000,               gpll3,    1,    0,     0),
+ 	F_MM( 680000000,    1360000000,               gpll3,    1,    0,     0), 
 	F_END
 };
 
