@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
- * Copyright (C) 2017 XiaoMi, Inc.
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,7 +11,7 @@
  * GNU General Public License for more details.
  */
 
-#include "skeleton64.dtsi"
+#include "../skeleton64.dtsi"
 #include <dt-bindings/clock/msm-clocks-8953.h>
 #include <dt-bindings/regulator/qcom,rpm-smd-regulator.h>
 #include <dt-bindings/gpio/gpio.h>
@@ -24,10 +23,10 @@
 	interrupt-parent = <&intc>;
 
 	chosen {
-		bootargs = "boot_cpus=0,1,2,3,4,5,6,7,8 sched_enable_hmp=1 sched_enable_power_aware=1";
+		bootargs = "boot_cpus=0,1,2,3,4,5,6,7 sched_enable_hmp=1 sched_enable_power_aware=1 kpti=1";
 	};
 
-	firmware: firmware {
+firmware: firmware {
 		android {
 			compatible = "android,firmware";
 			fstab {
@@ -53,7 +52,7 @@
 		other_ext_mem: other_ext_region@0 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0x0 0x85b00000 0x0 0xd00000>;
+			reg = <0x0 0x84A00000 0x0 0x1E00000>;
 		};
 
 		modem_mem: modem_region@0 {
@@ -119,6 +118,14 @@
 			alignment = <0 0x400000>;
 			size = <0 0x800000>;
 		};
+
+		pstore_reserve_mem: pstore_reserve_mem_region@0 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			linux,remove-completely;
+			reg = <0x0 0x9ff00000 0x0 0x00100000>;
+			label = "pstore_reserve_mem";
+		};
 	};
 
 	aliases {
@@ -147,16 +154,16 @@
 };
 
 #include "msm8953-pinctrl.dtsi"
-#include "msm8953-cpu.dtsi"
-#include "msm8953-gpu.dtsi"
-#include "msm8953-ion.dtsi"
-#include "msm8953-smp2p.dtsi"
-#include "msm-arm-smmu-8953.dtsi"
-#include "msm8953-coresight.dtsi"
-#include "msm8953-bus.dtsi"
-#include "msm8953-iommu-domains.dtsi"
-#include "msm8953-vidc.dtsi"
-#include "msm8953-pm.dtsi"
+#include "../msm8953-cpu.dtsi"
+#include "../msm8953-gpu.dtsi"
+#include "../msm8953-ion.dtsi"
+#include "../msm8953-smp2p.dtsi"
+#include "../msm-arm-smmu-8953.dtsi"
+#include "../msm8953-coresight.dtsi"
+#include "../msm8953-bus.dtsi"
+#include "../msm8953-iommu-domains.dtsi"
+#include "../msm8953-vidc.dtsi"
+#include "../msm8953-pm.dtsi"
 
 &soc {
 	#address-cells = <1>;
@@ -508,10 +515,10 @@
 		compatible = "qcom,msm-thermal";
 		qcom,sensor-id = <9>;
 		qcom,poll-ms = <250>;
-		qcom,limit-temp = <60>;
+		qcom,limit-temp = <50>;
 		qcom,temp-hysteresis = <10>;
 		qcom,freq-step = <2>;
-		qcom,core-limit-temp = <80>;
+		qcom,core-limit-temp = <50>;
 		qcom,core-temp-hysteresis = <10>;
 		qcom,hotplug-temp = <105>;
 		qcom,hotplug-temp-hysteresis = <15>;
@@ -520,7 +527,6 @@
 		qcom,freq-mitigation-value = <1036800>;
 		qcom,therm-reset-temp = <115>;
 		qcom,online-hotplug-core;
-    qcom,disable-core-control;
 		qcom,synchronous-cluster-id = <0 1>;
 		qcom,synchronous-cluster-map = <0 4 &CPU0 &CPU1 &CPU2 &CPU3>,
 						<1 4 &CPU4 &CPU5 &CPU6 &CPU7>;
@@ -550,7 +556,7 @@
 
 		msm_thermal_freq: qcom,vdd-apps-rstr {
 			qcom,vdd-rstr-reg = "vdd-apps";
-			qcom,levels = <307000 2016000 2208000>;
+			qcom,levels = <307000 1689600 2208000>;
 			qcom,freq-req;
 		};
 	};
@@ -561,7 +567,7 @@
 		qcom,bcl-framework-interface;
 		qcom,bcl-freq-control-list = <&CPU0 &CPU1 &CPU2 &CPU3
 						&CPU4 &CPU5 &CPU6 &CPU7>;
-		qcom,bcl-hotplug-list = <&CPU6 &CPU7>;
+		qcom,bcl-hotplug-list = <&CPU4 &CPU5 &CPU6 &CPU7>;
 		qcom,bcl-soc-hotplug-list = <&CPU4 &CPU5 &CPU6 &CPU7>;
 		qcom,ibat-monitor {
 			qcom,low-threshold-uamp = <3400000>;
@@ -569,7 +575,7 @@
 			qcom,mitigation-freq-khz = <1689600>;
 			qcom,vph-high-threshold-uv = <3500000>;
 			qcom,vph-low-threshold-uv = <3200000>;
-			qcom,soc-low-threshold = <10>;
+			qcom,soc-low-threshold = <5>;
 			qcom,thermal-handle = <&msm_thermal_freq>;
 		};
 	};
@@ -653,9 +659,46 @@
 		qcom,msm-bus,name = "blsp1_uart1";
 		qcom,msm-bus,num-cases = <2>;
 		qcom,msm-bus,num-paths = <1>;
+		qcom,detect-dpdm-floating;
 		qcom,msm-bus,vectors-KBps =
 				<86 512 0 0>,
 				<86 512 500 800>;
+		status = "disabled";
+	};
+
+blsp2_uart0: uart@7aef000 {
+		compatible = "qcom,msm-hsuart-v14";
+		reg = <0x7aef000 0x200>,
+			<0x7ac4000 0x1f000>;
+		reg-names = "core_mem", "bam_mem";
+
+		interrupt-names = "core_irq", "bam_irq", "wakeup_irq";
+		#address-cells = <0>;
+		interrupt-parent = <&blsp2_uart0>;
+		interrupts = <0 1 2>;
+		#interrupt-cells = <1>;
+		interrupt-map-mask = <0xffffffff>;
+		interrupt-map = <0 &intc 0 306 0
+				1 &intc 0 239 0
+				2 &tlmm 17 0>;
+
+		qcom,inject-rx-on-wakeup;
+		qcom,rx-char-to-inject = <0xFD>;
+		qcom,master-id = <84>;
+		clock-names = "core_clk", "iface_clk";
+		clocks = <&clock_gcc clk_gcc_blsp2_uart1_apps_clk>,
+			<&clock_gcc clk_gcc_blsp2_ahb_clk>;
+		pinctrl-names = "sleep", "default";
+		pinctrl-0 = <&blsp2_uart0_sleep>;
+		pinctrl-1 = <&blsp2_uart0_active>;
+		qcom,bam-tx-ep-pipe-index = <0>;
+		qcom,bam-rx-ep-pipe-index = <1>;
+		qcom,msm-bus,name = "blsp2_uart0";
+		qcom,msm-bus,num-cases = <2>;
+		qcom,msm-bus,num-paths = <1>;
+		qcom,msm-bus,vectors-KBps =
+				<84 512 0 0>,
+				<84 512 500 800>;
 		status = "disabled";
 	};
 
@@ -833,8 +876,9 @@
 
 	clock_gcc_mdss: qcom,gcc-mdss@1800000 {
 		compatible = "qcom,gcc-mdss-8953";
-		reg = <0x1800000 0x80000>;
-		reg-names = "cc_base";
+		reg = <0x1800000 0x80000>,
+			<0x00a4124 0x08>;
+		reg-names = "cc_base", "efuse";
 		clock-names = "pclk0_src", "pclk1_src",
 				"byte0_src", "byte1_src";
 		clocks = <&mdss_dsi0_pll clk_dsi0pll_pixel_clk_mux>,
@@ -902,6 +946,7 @@
 					<2016000000  10>,
 					<2150400000  11>,
 					<2208000000  12>;
+
 		qcom,speed0-bin-v0-cci =
 							<0  0>,
 						<160000000  1>,
@@ -917,8 +962,8 @@
 						<860160000  11>,
 						<883200000  12>;
 
-		qcom,speed2-bin-v0-cl =
-						 <0  0>,
+		qcom,speed2-bin-v0-cl=
+					 	 <0  0>,
 					 <307000000  1>,
 					 <652800000  2>,
 					 <806400000  3>,
@@ -1097,6 +1142,7 @@
 			<1804800 7104>,
 			<1958400 7104>,
 			<2016000 7104>,
+            <2150400 7104>,
 			<2208000 7104>;
 		};
 
@@ -1108,6 +1154,7 @@
 				<2208000 5859>;
 		};
 	};
+
 	rpm_bus: qcom,rpm-smd {
 		compatible = "qcom,rpm-smd";
 		rpm-channel-name = "rpm_requests";
@@ -1282,6 +1329,19 @@
 		compatible = "qcom,jtag-fuse-v2";
 		reg = <0xa601c 0x8>;
 		reg-names = "fuse-base";
+	};
+
+	sn_fuse: snfuse@0xa0128 {
+		compatible = "qcom,sn-fuse";
+		reg = <0xa0128 0x4>;
+		reg-names = "sn-base";
+	};
+
+
+	sec_boot_fuse: secbootfuse@0xa41d0 {
+		compatible = "qcom,sec-boot-fuse";
+		reg = <0xa41d0 0x4>;
+		reg-names = "sec-boot-base";
 	};
 
 	jtag_mm0: jtagmm@619c000 {
@@ -1678,9 +1738,9 @@
 		qcom,ce-opp-freq = <100000000>;
 	};
 
-	qcom_seecom: qseecom@85b00000 {
+	qcom_seecom: qseecom@84A00000 {
 		compatible = "qcom,qseecom";
-		reg = <0x85b00000 0x800000>;
+		reg = <0x84A00000 0x1900000>;
 		reg-names = "secapp-region";
 		qcom,hlos-num-ce-hw-instances = <1>;
 		qcom,hlos-ce-hw-instance = <0>;
@@ -1691,7 +1751,7 @@
 		qcom,msm-bus,num-cases = <4>;
 		qcom,msm-bus,num-paths = <1>;
 		qcom,support-bus-scaling;
-		qcom,appsbl-qseecom-support;
+		qcom,appsbl-qseecom-support; 
 		qcom,msm-bus,vectors-KBps =
 			<55 512 0 0>,
 			<55 512 0 0>,
@@ -2092,6 +2152,7 @@
 		interrupt-names = "hs_phy_irq", "ss_phy_irq", "pwr_event_irq";
 
 		USB3_GDSC-supply = <&gdsc_usb30>;
+		vbus_dwc3-supply = <&smbcharger_charger_otg>;
 		qcom,usb-dbm = <&dbm_1p5>;
 		qcom,msm-bus,name = "usb3";
 		qcom,msm-bus,num-cases = <2>;
@@ -2329,7 +2390,7 @@
 					0x974 0x8d8 0x8dc 0x804 0x800
 					0x808>;
 		vdd-supply = <&pm8953_l3>;
-		vdda18-supply = <&pm8953_l7>;
+		core-supply = <&pm8953_l7>;
 		qcom,vdd-voltage-level = <0 925000 925000>;
 		qcom,vbus-valid-override;
 
@@ -2346,10 +2407,11 @@
 
 	};
 
-	usb_audio_qmi_dev {
-		compatible = "qcom,usb-audio-qmi-dev";
-		qcom,usb-audio-intr-num = <2>;
-	};
+  usb_audio_qmi_dev { 
+
+    compatible = "qcom,usb-audio-qmi-dev"; 
+    qcom,usb-audio-intr-num = <2>; 
+  }; 
 
 	dbm_1p5: dbm@70f8000 {
 		compatible = "qcom,usb-dbm-1p5";
@@ -2364,14 +2426,14 @@
 	};
 };
 
-#include "msm-pm8953-rpm-regulator.dtsi"
+#include "../msm-pm8953-rpm-regulator.dtsi"
 #include "msm-pm8953.dtsi"
 #include "msm8953-regulator.dtsi"
 #include "msm-audio.dtsi"
 #include "msm8953-audio.dtsi"
-#include "msm-gdsc-8916.dtsi"
-#include "msm8953-camera.dtsi"
-#include "msm8953-mdss.dtsi"
+#include "../msm-gdsc-8916.dtsi"
+#include "../msm8953-camera.dtsi"
+#include "../msm8953-mdss.dtsi"
 #include "msm8953-mdss-pll.dtsi"
 
 &gdsc_venus {
