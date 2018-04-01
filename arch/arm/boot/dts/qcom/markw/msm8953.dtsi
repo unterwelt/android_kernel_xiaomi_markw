@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,7 +23,7 @@
 	interrupt-parent = <&intc>;
 
 	chosen {
-		bootargs = "boot_cpus=0,1,2,3,4,5,6,7 sched_enable_hmp=1 sched_enable_power_aware=1 kpti=1";
+		bootargs = "boot_cpus=0,1,2,3,4,5,6,7 sched_enable_hmp=1 sched_enable_power_aware=1";
 	};
 
 firmware: firmware {
@@ -575,7 +575,7 @@ firmware: firmware {
 			qcom,mitigation-freq-khz = <1689600>;
 			qcom,vph-high-threshold-uv = <3500000>;
 			qcom,vph-low-threshold-uv = <3200000>;
-			qcom,soc-low-threshold = <5>;
+			qcom,soc-low-threshold = <10>;
 			qcom,thermal-handle = <&msm_thermal_freq>;
 		};
 	};
@@ -2405,12 +2405,6 @@ blsp2_uart0: uart@7aef000 {
 			      "phy_phy_reset", "ref_clk_src", "ref_clk";
 
 	};
-
-  usb_audio_qmi_dev { 
-
-    compatible = "qcom,usb-audio-qmi-dev"; 
-    qcom,usb-audio-intr-num = <2>; 
-  }; 
 
 	dbm_1p5: dbm@70f8000 {
 		compatible = "qcom,usb-dbm-1p5";

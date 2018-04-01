@@ -567,8 +567,6 @@
 		qcom,bcl-framework-interface;
 		qcom,bcl-freq-control-list = <&CPU0 &CPU1 &CPU2 &CPU3
 						&CPU4 &CPU5 &CPU6 &CPU7>;
-		qcom,bcl-hotplug-list = <&CPU4 &CPU5 &CPU6 &CPU7>;
-		qcom,bcl-soc-hotplug-list = <&CPU4 &CPU5 &CPU6 &CPU7>;
 		qcom,ibat-monitor {
 			qcom,low-threshold-uamp = <3400000>;
 			qcom,high-threshold-uamp = <4200000>;
@@ -2145,7 +2143,7 @@
 		USB3_GDSC-supply = <&gdsc_usb30>;
 		qcom,usb-dbm = <&dbm_1p5>;
 		qcom,msm-bus,name = "usb3";
-		qcom,msm-bus,num-cases = <2>;
+		qcom,msm-bus,num-cases = <3>;
 		qcom,msm-bus,num-paths = <1>;
 		qcom,detect-dpdm-floating;
 		qcom,msm-bus,vectors-KBps =
