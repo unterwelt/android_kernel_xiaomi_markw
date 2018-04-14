@@ -18,9 +18,6 @@
 #define ISP_META_CHANNEL_BIT  (0x10000 << 3)
 #define ISP_SCRATCH_BUF_BIT   (0x10000 << 4)
 #define ISP_OFFLINE_STATS_BIT (0x10000 << 5)
-#define ISP_SVHDR_IN_BIT      (0x10000 << 6) /* RDI hw stream for SVHDR */
-#define ISP_SVHDR_OUT_BIT     (0x10000 << 7) /* SVHDR output bufq stream*/
-
 #define ISP_STATS_STREAM_BIT  0x80000000
 
 struct msm_vfe_cfg_cmd_list;
@@ -373,13 +370,6 @@ struct msm_vfe_axi_stream_cfg_update_info {
 	struct msm_isp_sw_framskip sw_skip_info;
 };
 
-struct msm_vfe_axi_stream_cfg_update_info_req_frm {
-	uint32_t stream_handle;
-	uint32_t user_stream_id;
-	uint32_t frame_id;
-	uint32_t buf_index;
-};
-
 struct msm_vfe_axi_halt_cmd {
 	uint32_t stop_camif;
 	uint32_t overflow_detected;
@@ -402,11 +392,8 @@ struct msm_vfe_axi_stream_update_cmd {
 	 * For backward compatibility, ensure 1st member of any struct
 	 * in union below is uint32_t stream_handle.
 	 */
-	union {
-		struct msm_vfe_axi_stream_cfg_update_info
+	struct msm_vfe_axi_stream_cfg_update_info
 					update_info[MSM_ISP_STATS_MAX];
-		struct msm_vfe_axi_stream_cfg_update_info_req_frm req_frm_ver2;
-	};
 };
 
 struct msm_vfe_smmu_attach_cmd {
@@ -839,10 +826,6 @@ struct msm_isp_ahb_clk_cfg {
 #define V4L2_PIX_FMT_P16GBRG10 v4l2_fourcc('P', 'G', 'B', '0')
 #define V4L2_PIX_FMT_P16GRBG10 v4l2_fourcc('P', 'G', 'R', '0')
 #define V4L2_PIX_FMT_P16RGGB10 v4l2_fourcc('P', 'R', 'G', '0')
-#define V4L2_PIX_FMT_P16BGGR12 v4l2_fourcc('P', 'B', 'G', '2')
-#define V4L2_PIX_FMT_P16GBRG12 v4l2_fourcc('P', 'G', 'B', '2')
-#define V4L2_PIX_FMT_P16GRBG12 v4l2_fourcc('P', 'G', 'R', '2')
-#define V4L2_PIX_FMT_P16RGGB12 v4l2_fourcc('P', 'R', 'G', '2')
 #define V4L2_PIX_FMT_NV14 v4l2_fourcc('N', 'V', '1', '4')
 #define V4L2_PIX_FMT_NV41 v4l2_fourcc('N', 'V', '4', '1')
 #define V4L2_PIX_FMT_META v4l2_fourcc('Q', 'M', 'E', 'T')
