@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -516,7 +516,7 @@ static void msm_vfe44_process_epoch_irq(struct vfe_device *vfe_dev,
 			msm_isp_notify(vfe_dev, ISP_EVENT_SOF, VFE_PIX_0, ts);
 			if (vfe_dev->axi_data.stream_update[VFE_PIX_0])
 				msm_isp_axi_stream_update(vfe_dev, VFE_PIX_0);
-				vfe_dev->hw_info->vfe_ops.core_ops.reg_update(
+			vfe_dev->hw_info->vfe_ops.core_ops.reg_update(
 				   vfe_dev, VFE_PIX_0);
 		}
 	}
@@ -551,6 +551,12 @@ static void msm_vfe44_reg_update(struct vfe_device *vfe_dev,
 		vfe_dev->reg_update_requested;
 	if ((vfe_dev->is_split && vfe_dev->pdev->id == ISP_VFE1) &&
 		((frame_src == VFE_PIX_0) || (frame_src == VFE_SRC_MAX))) {
+		if (!vfe_dev->common_data->dual_vfe_res->vfe_base[ISP_VFE0]) {
+			pr_err("%s vfe_base for ISP_VFE0 is NULL\n", __func__);
+			spin_unlock_irqrestore(&vfe_dev->reg_update_lock,
+				flags);
+			return;
+		}
 		msm_camera_io_w_mb(update_mask,
 			vfe_dev->common_data->dual_vfe_res->vfe_base[ISP_VFE0]
 			+ 0x378);
@@ -1325,8 +1331,8 @@ static int msm_vfe44_axi_restart(struct vfe_device *vfe_dev,
 	/* Start AXI */
 	msm_camera_io_w(0x0, vfe_dev->vfe_base + 0x2C0);
 
-	msm_vfe44_config_irq(vfe_dev, vfe_dev->irq0_mask, vfe_dev->irq1_mask,
-		MSM_ISP_IRQ_SET);
+	msm_vfe44_config_irq(vfe_dev, vfe_dev->recovery_irq0_mask,
+		vfe_dev->recovery_irq1_mask, MSM_ISP_IRQ_SET);
 
 	vfe_dev->hw_info->vfe_ops.core_ops.reg_update(vfe_dev, VFE_SRC_MAX);
 	memset(&vfe_dev->error_info, 0, sizeof(vfe_dev->error_info));

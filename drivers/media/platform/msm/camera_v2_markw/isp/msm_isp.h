@@ -1,5 +1,4 @@
 /* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
- * Copyright (C) 2017 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -65,6 +64,7 @@
 #define MAX_BUFFERS_IN_HW 2
 
 #define MAX_VFE 2
+#define MAX_RECOVERY_THRESHOLD  5
 
 struct vfe_device;
 struct msm_vfe_axi_stream;
@@ -399,6 +399,7 @@ enum msm_vfe_axi_stream_type {
 struct msm_vfe_frame_request_queue {
 	struct list_head list;
 	enum msm_vfe_buff_queue_id buff_queue_id;
+	uint32_t buf_index;
 	uint8_t cmd_used;
 };
 
@@ -518,6 +519,7 @@ struct msm_vfe_axi_shared_data {
 	uint32_t event_mask;
 	uint8_t enable_frameid_recovery;
 	enum msm_vfe_camif_state camif_state;
+	uint32_t recovery_count;
 };
 
 struct msm_vfe_stats_hardware_info {
@@ -677,6 +679,7 @@ struct master_slave_resource_info {
 
 struct msm_vfe_common_dev_data {
 	spinlock_t common_dev_data_lock;
+	spinlock_t common_dev_axi_lock;
 	struct dual_vfe_resource *dual_vfe_res;
 	struct master_slave_resource_info ms_resource;
 };
@@ -693,6 +696,11 @@ struct msm_vfe_common_subdev {
 
 	/* Common Data */
 	struct msm_vfe_common_dev_data *common_data;
+};
+
+struct isp_proc {
+	uint32_t  kernel_sofid;
+	uint32_t  vfeid;
 };
 
 struct vfe_device {
@@ -773,6 +781,11 @@ struct vfe_device {
 	/* irq info */
 	uint32_t irq0_mask;
 	uint32_t irq1_mask;
+	/* before halt irq info */
+	uint32_t recovery_irq0_mask;
+	uint32_t recovery_irq1_mask;
+	uint32_t ms_frame_id;
+	struct isp_proc *isp_page;
 };
 
 struct vfe_parent_device {

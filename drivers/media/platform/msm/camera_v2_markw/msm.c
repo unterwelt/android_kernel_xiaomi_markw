@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,7 +31,6 @@
 #include "msm_sd.h"
 #include "cam_hw_ops.h"
 #include <media/msmb_generic_buf_mgr.h>
-
 
 static struct v4l2_device *msm_v4l2_dev;
 static struct list_head    ordered_sd_list;
@@ -287,6 +286,7 @@ void msm_delete_stream(unsigned int session_id, unsigned int stream_id)
 		return;
 
 	while (1) {
+		unsigned long wl_flags;
 
 		if (try_count > 5) {
 			pr_err("%s : not able to delete stream %d\n",
@@ -294,18 +294,20 @@ void msm_delete_stream(unsigned int session_id, unsigned int stream_id)
 			break;
 		}
 
-		write_lock(&session->stream_rwlock);
+		write_lock_irqsave(&session->stream_rwlock, wl_flags);
 		try_count++;
 		stream = msm_queue_find(&session->stream_q, struct msm_stream,
 			list, __msm_queue_find_stream, &stream_id);
 
 		if (!stream) {
-			write_unlock(&session->stream_rwlock);
+			write_unlock_irqrestore(&session->stream_rwlock,
+				wl_flags);
 			return;
 		}
 
 		if (msm_vb2_get_stream_state(stream) != 1) {
-			write_unlock(&session->stream_rwlock);
+			write_unlock_irqrestore(&session->stream_rwlock,
+				wl_flags);
 			continue;
 		}
 
@@ -315,21 +317,10 @@ void msm_delete_stream(unsigned int session_id, unsigned int stream_id)
 		kfree(stream);
 		stream = NULL;
 		spin_unlock_irqrestore(&(session->stream_q.lock), flags);
-		write_unlock(&session->stream_rwlock);
+		write_unlock_irqrestore(&session->stream_rwlock, wl_flags);
 		break;
 	}
 
-
-	stream = msm_queue_find(&session->stream_q, struct msm_stream,
-		list, __msm_queue_find_stream, &stream_id);
-	if (!stream)
-		return;
-	spin_lock_irqsave(&(session->stream_q.lock), flags);
-	list_del_init(&stream->list);
-	session->stream_q.len--;
-	kfree(stream);
-	stream = NULL;
-	spin_unlock_irqrestore(&(session->stream_q.lock), flags);
 }
 EXPORT_SYMBOL(msm_delete_stream);
 
@@ -737,6 +728,19 @@ static long msm_private_ioctl(struct file *file, void *fh,
 		return 0;
 	}
 
+	if (!event_data)
+		return -EINVAL;
+
+	switch (cmd) {
+	case MSM_CAM_V4L2_IOCTL_NOTIFY:
+	case MSM_CAM_V4L2_IOCTL_CMD_ACK:
+	case MSM_CAM_V4L2_IOCTL_NOTIFY_DEBUG:
+	case MSM_CAM_V4L2_IOCTL_NOTIFY_ERROR:
+		break;
+	default:
+		return -ENOTTY;
+	}
+
 	memset(&event, 0, sizeof(struct v4l2_event));
 	session_id = event_data->session_id;
 	stream_id = event_data->stream_id;
@@ -1046,10 +1050,8 @@ static int msm_open(struct file *filep)
 	BUG_ON(!pvdev);
 
 	/* !!! only ONE open is allowed !!! */
-	if (atomic_read(&pvdev->opened))
+	if (atomic_cmpxchg(&pvdev->opened, 0, 1))
 		return -EBUSY;
-
-	atomic_set(&pvdev->opened, 1);
 
 	spin_lock_irqsave(&msm_pid_lock, flags);
 	msm_pid = get_pid(task_pid(current));
@@ -1183,22 +1185,27 @@ struct msm_session *msm_get_session_from_vb2q(struct vb2_queue *q)
 }
 EXPORT_SYMBOL(msm_get_session_from_vb2q);
 
+
 #ifdef CONFIG_COMPAT
 long msm_copy_camera_private_ioctl_args(unsigned long arg,
 	struct msm_camera_private_ioctl_arg *k_ioctl,
 	void __user **tmp_compat_ioctl_ptr)
 {
-	struct msm_camera_private_ioctl_arg *up_ioctl_ptr =
-		(struct msm_camera_private_ioctl_arg *)arg;
+	struct msm_camera_private_ioctl_arg up_ioctl;
 
 	if (WARN_ON(!arg || !k_ioctl || !tmp_compat_ioctl_ptr))
 		return -EIO;
 
-	k_ioctl->id = up_ioctl_ptr->id;
-	k_ioctl->size = up_ioctl_ptr->size;
-	k_ioctl->result = up_ioctl_ptr->result;
-	k_ioctl->reserved = up_ioctl_ptr->reserved;
-	*tmp_compat_ioctl_ptr = compat_ptr(up_ioctl_ptr->ioctl_ptr);
+	if (copy_from_user(&up_ioctl,
+		(struct msm_camera_private_ioctl_arg *)arg,
+		sizeof(struct msm_camera_private_ioctl_arg)))
+		return -EFAULT;
+
+	k_ioctl->id = up_ioctl.id;
+	k_ioctl->size = up_ioctl.size;
+	k_ioctl->result = up_ioctl.result;
+	k_ioctl->reserved = up_ioctl.reserved;
+	*tmp_compat_ioctl_ptr = compat_ptr(up_ioctl.ioctl_ptr);
 
 	return 0;
 }
@@ -1253,7 +1260,7 @@ static ssize_t write_logsync(struct file *file, const char __user *buf,
 	uint64_t seq_num = 0;
 	int ret;
 
-	if (copy_from_user(lbuf, buf, sizeof(lbuf)))
+	if (copy_from_user(lbuf, buf, sizeof(lbuf) - 1))
 		return -EFAULT;
 
 	ret = sscanf(lbuf, "%llu", &seq_num);
@@ -1311,8 +1318,8 @@ static int msm_probe(struct platform_device *pdev)
 	if (WARN_ON(rc < 0))
 		goto media_fail;
 
-	if (WARN_ON((rc == media_entity_init(&pvdev->vdev->entity,
-			0, NULL, 0)) < 0))
+	rc = media_entity_init(&pvdev->vdev->entity, 0, NULL, 0);
+	if (WARN_ON(rc < 0))
 		goto entity_fail;
 
 	pvdev->vdev->entity.type = MEDIA_ENT_T_DEVNODE_V4L;

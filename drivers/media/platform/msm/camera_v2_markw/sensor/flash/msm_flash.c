@@ -1,5 +1,4 @@
-/* Copyright (c) 2009-2016, The Linux Foundation. All rights reserved.
- * Copyright (C) 2017 XiaoMi, Inc.
+/* Copyright (c) 2009-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -152,6 +151,12 @@ static int32_t msm_flash_i2c_write_table(
 	conf_array.reg_setting = settings->reg_setting_a;
 	conf_array.size = settings->size;
 
+	/* Validate the settings size */
+	if((!conf_array.size) || (conf_array.size > MAX_I2C_REG_SET)) {
+		pr_err("failed: invalid size %d", conf_array.size);
+		return -EINVAL;
+	}
+
 	return flash_ctrl->flash_i2c_client.i2c_func_tbl->i2c_write_table(
 		&flash_ctrl->flash_i2c_client, &conf_array);
 }
@@ -268,6 +273,16 @@ static int32_t msm_flash_i2c_init(
 		flash_ctrl->power_setting_array.size;
 	flash_ctrl->power_info.power_down_setting_size =
 		flash_ctrl->power_setting_array.size_down;
+
+	if ((flash_ctrl->power_info.power_setting_size > MAX_POWER_CONFIG) ||
+	(flash_ctrl->power_info.power_down_setting_size > MAX_POWER_CONFIG)) {
+		pr_err("%s:%d invalid power setting size=%d size_down=%d\n",
+			__func__, __LINE__,
+			flash_ctrl->power_info.power_setting_size,
+			flash_ctrl->power_info.power_down_setting_size);
+		rc = -EINVAL;
+		goto msm_flash_i2c_init_fail;
+	}
 
 	rc = msm_camera_power_up(&flash_ctrl->power_info,
 		flash_ctrl->flash_device_type,
@@ -422,7 +437,9 @@ static int32_t msm_flash_i2c_write_setting_array(
 	return rc;
 }
 
+#ifdef CONFIG_MACH_XIAOMI_MARKW
 struct msm_flash_ctrl_t *flash_ctrl_wt = NULL;
+#endif
 
 static int32_t msm_flash_init(
 	struct msm_flash_ctrl_t *flash_ctrl,
@@ -494,6 +511,64 @@ static int32_t msm_flash_init(
 	return 0;
 }
 
+static int32_t msm_flash_init_prepare(
+	struct msm_flash_ctrl_t *flash_ctrl,
+	struct msm_flash_cfg_data_t *flash_data)
+{
+#ifdef CONFIG_COMPAT
+	struct msm_flash_cfg_data_t flash_data_k;
+	struct msm_flash_init_info_t flash_init_info;
+	int32_t i = 0;
+	if(!is_compat_task()) {
+		/*for 64-bit usecase,it need copy the data to local memory*/
+		flash_data_k.cfg_type = flash_data->cfg_type;
+		for (i = 0; i < MAX_LED_TRIGGERS; i++) {
+			flash_data_k.flash_current[i] =
+				flash_data->flash_current[i];
+			flash_data_k.flash_duration[i] =
+				flash_data->flash_duration[i];
+		}
+
+		flash_data_k.cfg.flash_init_info = &flash_init_info;
+		if (copy_from_user(&flash_init_info,
+			(void *)(flash_data->cfg.flash_init_info),
+			sizeof(struct msm_flash_init_info_t))) {
+			pr_err("%s copy_from_user failed %d\n",
+				__func__, __LINE__);
+			return -EFAULT;
+		}
+		return msm_flash_init(flash_ctrl, &flash_data_k);
+	}
+	/*
+	 * for 32-bit usecase,it already copy the userspace
+	 * data to local memory in msm_flash_subdev_do_ioctl()
+	 * so here do not need copy from user
+	 */
+	return msm_flash_init(flash_ctrl, flash_data);
+#else
+	struct msm_flash_cfg_data_t flash_data_k;
+	struct msm_flash_init_info_t flash_init_info;
+	int32_t i = 0;
+	flash_data_k.cfg_type = flash_data->cfg_type;
+	for (i = 0; i < MAX_LED_TRIGGERS; i++) {
+		flash_data_k.flash_current[i] =
+			flash_data->flash_current[i];
+		flash_data_k.flash_duration[i] =
+			flash_data->flash_duration[i];
+	}
+
+	flash_data_k.cfg.flash_init_info = &flash_init_info;
+	if (copy_from_user(&flash_init_info,
+		(void *)(flash_data->cfg.flash_init_info),
+		sizeof(struct msm_flash_init_info_t))) {
+		pr_err("%s copy_from_user failed %d\n",
+			__func__, __LINE__);
+		return -EFAULT;
+	}
+	return msm_flash_init(flash_ctrl, &flash_data_k);
+#endif
+}
+
 static int32_t msm_flash_low(
 	struct msm_flash_ctrl_t *flash_ctrl,
 	struct msm_flash_cfg_data_t *flash_data)
@@ -508,7 +583,11 @@ static int32_t msm_flash_low(
 			led_trigger_event(flash_ctrl->flash_trigger[i], 0);
 
 	/* Turn on flash triggers */
+#ifdef CONFIG_MACH_XIAOMI_MARKW
 	for (i = 0; i < flash_ctrl->torch_num_sources - 1; i++) {
+#else
+	for (i = 0; i < flash_ctrl->torch_num_sources; i++) {
+#endif
 		if (flash_ctrl->torch_trigger[i]) {
 			max_current = flash_ctrl->torch_max_current[i];
 			if (flash_data->flash_current[i] >= 0 &&
@@ -531,7 +610,7 @@ static int32_t msm_flash_low(
 	return 0;
 }
 
-
+#ifdef CONFIG_MACH_XIAOMI_MARKW
 int32_t wt_flash_flashlight(bool boolean)
 {
 	uint32_t curr = 0;
@@ -560,6 +639,7 @@ int32_t wt_flash_flashlight(bool boolean)
 	}
 	return 0;
 }
+#endif
 
 static int32_t msm_flash_high(
 	struct msm_flash_ctrl_t *flash_ctrl,
@@ -570,7 +650,11 @@ static int32_t msm_flash_high(
 	int32_t i = 0;
 
 	/* Turn off torch triggers */
+#ifdef CONFIG_MACH_XIAOMI_MARKW
 	for (i = 0; i < flash_ctrl->torch_num_sources - 1; i++)
+#else
+	for (i = 0; i < flash_ctrl->torch_num_sources; i++)
+#endif
 		if (flash_ctrl->torch_trigger[i])
 			led_trigger_event(flash_ctrl->torch_trigger[i], 0);
 
@@ -620,7 +704,7 @@ static int32_t msm_flash_release(
 static int32_t msm_flash_config(struct msm_flash_ctrl_t *flash_ctrl,
 	void __user *argp)
 {
-	int32_t rc = -EINVAL;
+	int32_t rc = 0;
 	struct msm_flash_cfg_data_t *flash_data =
 		(struct msm_flash_cfg_data_t *) argp;
 
@@ -630,7 +714,7 @@ static int32_t msm_flash_config(struct msm_flash_ctrl_t *flash_ctrl,
 
 	switch (flash_data->cfg_type) {
 	case CFG_FLASH_INIT:
-		rc = msm_flash_init(flash_ctrl, flash_data);
+		rc = msm_flash_init_prepare(flash_ctrl, flash_data);
 		break;
 	case CFG_FLASH_RELEASE:
 		if (flash_ctrl->flash_state == MSM_CAMERA_FLASH_INIT)
@@ -924,6 +1008,7 @@ static int32_t msm_flash_get_dt_data(struct device_node *of_node,
 	CDBG("subdev id %d\n", fctrl->subdev_id);
 
 	fctrl->flash_driver_type = FLASH_DRIVER_DEFAULT;
+#ifdef CONFIG_MACH_XIAOMI_MARKW
 	rc = msm_flash_get_pmic_source_info(of_node, fctrl);
 	if (rc < 0) {
 		pr_err("%s:%d msm_flash_get_pmic_source_info failed rc %d\n", __func__, __LINE__, rc);
@@ -931,6 +1016,7 @@ static int32_t msm_flash_get_dt_data(struct device_node *of_node,
 	}
 	if (fctrl->flash_driver_type == FLASH_DRIVER_PMIC)
 		return 0;
+#endif
 
 	/* Read the CCI master. Use M0 if not available in the node */
 	rc = of_property_read_u32(of_node, "qcom,cci-master",
@@ -945,6 +1031,15 @@ static int32_t msm_flash_get_dt_data(struct device_node *of_node,
 		fctrl->flash_driver_type = FLASH_DRIVER_I2C;
 	}
 
+#ifndef CONFIG_MACH_XIAOMI_MARKW
+	/* Read the flash and torch source info from device tree node */
+	rc = msm_flash_get_pmic_source_info(of_node, fctrl);
+	if (rc < 0) {
+		pr_err("%s:%d msm_flash_get_pmic_source_info failed rc %d\n",
+			__func__, __LINE__, rc);
+		return rc;
+	}
+#endif
 	/* Read the gpio information from device tree */
 	rc = msm_sensor_driver_get_gpio_data(
 		&(fctrl->power_info.gpio_conf), of_node);
@@ -985,13 +1080,13 @@ static long msm_flash_subdev_do_ioctl(
 	sd = vdev_to_v4l2_subdev(vdev);
 	u32 = (struct msm_flash_cfg_data_t32 *)arg;
 
-	flash_data.cfg_type = u32->cfg_type;
-	for (i = 0; i < MAX_LED_TRIGGERS; i++) {
-		flash_data.flash_current[i] = u32->flash_current[i];
-		flash_data.flash_duration[i] = u32->flash_duration[i];
-	}
 	switch (cmd) {
 	case VIDIOC_MSM_FLASH_CFG32:
+		flash_data.cfg_type = u32->cfg_type;
+		for (i = 0; i < MAX_LED_TRIGGERS; i++) {
+			flash_data.flash_current[i] = u32->flash_current[i];
+			flash_data.flash_duration[i] = u32->flash_duration[i];
+		}
 		cmd = VIDIOC_MSM_FLASH_CFG;
 		switch (flash_data.cfg_type) {
 		case CFG_FLASH_OFF:
@@ -1024,6 +1119,9 @@ static long msm_flash_subdev_do_ioctl(
 			break;
 		}
 		break;
+	case VIDIOC_MSM_FLASH_CFG:
+		pr_err("invalid cmd 0x%x received\n", cmd);
+		return -EINVAL;
 	default:
 		return msm_flash_subdev_ioctl(sd, cmd, arg);
 	}
@@ -1117,9 +1215,9 @@ static int32_t msm_flash_platform_probe(struct platform_device *pdev)
 	if (flash_ctrl->flash_driver_type == FLASH_DRIVER_PMIC)
 		rc = msm_torch_create_classdev(pdev, flash_ctrl);
 
-
+#ifdef CONFIG_MACH_XIAOMI_MARKW
 	flash_ctrl_wt = flash_ctrl;
-
+#endif
 	CDBG("probe success\n");
 	return rc;
 }
