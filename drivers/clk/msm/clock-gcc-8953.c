@@ -274,7 +274,7 @@ static struct rcg_clk csi0_clk_src = {
 };
 
 static struct clk_freq_tbl ftbl_apss_ahb_clk_src[] = {
-	F(  19200000,            xo_a,    1,    0,     0),
+	F(  12000000,            xo_a,    1,    0,     0),
 	F(  25000000, gpll0_main_div2,   16,    0,     0),
 	F(  50000000,           gpll0,   16,    0,     0),
 	F( 100000000,           gpll0,    8,    0,     0),
