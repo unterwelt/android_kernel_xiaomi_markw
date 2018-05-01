@@ -910,7 +910,7 @@ blsp2_uart0: uart@7aef000 {
 			< 358000000   4 >,  /* SVS Plus  */
 			< 434000000   5 >,  /* NOM       */
 			< 542000000   6 >,  /* Nom Plus  */
-			< 630000000   7 >,  /* Turbo     */
+			< 650000000   7 >,  /* Turbo     */
 			< 700000000   8 >;  /* Turbo Plus*/
 		#clock-cells = <1>;
 	};
