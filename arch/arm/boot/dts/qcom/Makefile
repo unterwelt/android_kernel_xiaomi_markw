@@ -1,10 +1,6 @@
-dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-cdp.dtb \
-	msm8996-v2-pmi8994-mtp.dtb \
-	msm8996-v2-pmi8994-pmk8001-cdp.dtb \
+dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-mtp.dtb \
 	msm8996-v2-pmi8994-pmk8001-mtp.dtb \
-	msm8996-v2-pmi8994-pm8004-cdp.dtb \
 	msm8996-v2-pmi8994-pm8004-mtp.dtb \
-	msm8996-v2-pmi8994-pm8004-pmk8001-cdp.dtb \
 	msm8996-v2-pmi8994-pm8004-pmk8001-mtp.dtb \
 	msm8996-v2-fluid.dtb \
 	msm8996-v2-liquid.dtb \
@@ -85,11 +81,7 @@ dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-cdp.dtb \
 	msm8996-v3.0-fluid.dtb \
 	msm8996-v3.0-liquid.dtb \
 	msm8996-v3.0-dtp.dtb \
-	apq8096-v2-pmi8994-cdp.dtb \
 	apq8096-v2-pmi8994-mtp.dtb \
-	apq8096-v2-pmi8994-pmk8001-cdp.dtb \
-	apq8096-v2-pmi8994-pm8004-cdp.dtb \
-	apq8096-v2-pmi8994-pm8004-pmk8001-cdp.dtb \
 	apq8096-v2-liquid.dtb \
 	apq8096-v2-dragonboard.dtb \
 	apq8096-v2-auto-dragonboard.dtb \
@@ -254,8 +246,13 @@ dtb-$(CONFIG_ARCH_MSM8940) += msm8940-pmi8937-cdp.dtb \
 	msm8940-pmi8940-qrd-sku7.dtb
 
 ifeq ($(CONFIG_MACH_XIAOMI_MSM8953),y)
-dtb-$(CONFIG_MACH_XIAOMI_MIDO) += msm8953-qrd-sku3.dtb
-dtb-$(CONFIG_MACH_XIAOMI_MARKW) += msm8953-qrd-wt88553.dtb
+ifneq ($(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE),y)
+# Build non-treble DTB as well
+dtb-$(CONFIG_MACH_XIAOMI_MIDO) += msm8953-qrd-sku3-mido-nontreble.dtb
+endif
+dtb-$(CONFIG_MACH_XIAOMI_MARKW) += msm8953-qrd-markw.dtb 
+dtb-$(CONFIG_MACH_XIAOMI_MIDO) += msm8953-qrd-sku3-mido-treble.dtb
+dtb-$(CONFIG_MACH_XIAOMI_TISSOT) += msm8953-qrd-sku3-tissot.dtb
 else
 dtb-$(CONFIG_ARCH_MSM8953) += msm8953-sim.dtb \
 	msm8953-rumi.dtb \
@@ -282,6 +279,7 @@ dtb-$(CONFIG_ARCH_MSM8953) += msm8953-sim.dtb \
 	msm8953-pmi8937-mtp.dtb \
 	msm8953-pmi8940-ext-codec-mtp.dtb \
 	msm8953-pmi8937-ext-codec-mtp.dtb
+endif
 
 dtb-$(CONFIG_ARCH_SDM450) += sdm450-rcm.dtb \
 	sdm450-cdp.dtb \
@@ -292,7 +290,6 @@ dtb-$(CONFIG_ARCH_SDM450) += sdm450-rcm.dtb \
 	sdm450-iot-mtp.dtb \
 	sda450-cdp.dtb \
 	sda450-mtp.dtb
-	endif
 
 dtb-$(CONFIG_ARCH_MDM9607) += mdm9607-rumi.dtb \
 	mdm9607-cdp.dtb \
