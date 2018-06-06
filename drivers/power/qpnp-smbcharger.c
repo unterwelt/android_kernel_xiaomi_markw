@@ -1,5 +1,4 @@
-/* Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
- * Copyright (C) 2017 XiaoMi, Inc.
+/* Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -453,7 +452,7 @@ module_param_named(
 	int, 0664
 );
 
-static int smbchg_default_hvdcp3_icl_ma = 3000;
+static int smbchg_default_hvdcp3_icl_ma = 2200;
 module_param_named(
 	default_hvdcp3_icl_ma, smbchg_default_hvdcp3_icl_ma,
 	int, S_IRUSR | S_IWUSR
@@ -1966,7 +1965,7 @@ static int smbchg_set_fastchg_current_raw(struct smbchg_chip *chip,
 #define USBIN_ACTIVE_PWR_SRC_BIT	BIT(1)
 #define DCIN_ACTIVE_PWR_SRC_BIT		BIT(0)
 #define PARALLEL_REENABLE_TIMER_MS	1000
-#define PARALLEL_CHG_THRESHOLD_CURRENT	2000
+#define PARALLEL_CHG_THRESHOLD_CURRENT	2200
 static bool smbchg_is_usbin_active_pwr_src(struct smbchg_chip *chip)
 {
 	int rc;
@@ -4936,20 +4935,12 @@ static int smbchg_restricted_charging(struct smbchg_chip *chip, bool enable)
 
 	return rc;
 }
-extern void ist30xx_set_ta_mode(bool mode);
-extern void tpd_usb_plugin(bool mode);
-int set_usb_charge_mode_par = 0;
+
 static void handle_usb_removal(struct smbchg_chip *chip)
 {
 	struct power_supply *parallel_psy = get_parallel_psy(chip);
 	int rc;
 
-	if (set_usb_charge_mode_par == 1) {
-		ist30xx_set_ta_mode(0);
-	} else if (set_usb_charge_mode_par == 2) {
-		tpd_usb_plugin(0);
-	}
-printk("set_usb_charge_mode_par off = %d\n", set_usb_charge_mode_par);
 	pr_smb(PR_STATUS, "triggered\n");
 	smbchg_aicl_deglitch_wa_check(chip);
 	/* Clear the OV detected status set before */
@@ -5019,25 +5010,16 @@ static bool is_usbin_uv_high(struct smbchg_chip *chip)
 	return reg &= USBIN_UV_BIT;
 }
 
-static int rerun_apsd(struct smbchg_chip *chip);
 #define HVDCP_NOTIFY_MS		2500
 static void handle_usb_insertion(struct smbchg_chip *chip)
 {
 	enum power_supply_type usb_supply_type;
 	int rc;
 	char *usb_type_name = "null";
-	if (set_usb_charge_mode_par == 1) {
-		ist30xx_set_ta_mode(1);
-	} else if (set_usb_charge_mode_par == 2) {
-		tpd_usb_plugin(1);
-	}
+
 	pr_smb(PR_STATUS, "triggered\n");
 	/* usb inserted */
 	read_usb_type(chip, &usb_type_name, &usb_supply_type);
-	if (usb_supply_type == POWER_SUPPLY_TYPE_USB_CDP || usb_supply_type == POWER_SUPPLY_TYPE_USB) {
-		rc = rerun_apsd(chip);
-		read_usb_type(chip, &usb_type_name, &usb_supply_type);
-	}
 	pr_smb(PR_STATUS,
 		"inserted type = %d (%s)", usb_supply_type, usb_type_name);
 
@@ -6245,6 +6227,7 @@ static int smbchg_battery_set_property(struct power_supply *psy,
 		rc = vote(chip->dc_suspend_votable, USER_EN_VOTER,
 				!val->intval, 0);
 		chip->chg_enabled = val->intval;
+		power_supply_changed(chip->usb_psy);
 		schedule_work(&chip->usb_set_online_work);
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
@@ -7674,20 +7657,6 @@ static int smbchg_hw_init(struct smbchg_chip *chip)
 		if (rc < 0)
 			dev_err(chip->dev, "Couldn't set OTG OC config rc = %d\n",
 				rc);
-
-		rc = smbchg_sec_masked_write(chip, chip->otg_base + OTG_CFG, 0x0c, 0x8);
-		if (rc < 0) {
-			dev_err(chip->dev, "Couldn't set SMBCHGL_OTG_CFG rc=%d\n",
-				rc);
-		}
-
-		rc = smbchg_read(chip, &reg, chip->otg_base + OTG_CFG, 1);
-		printk("%s:read OTG_CFG=%2x\n", __func__, reg);
-		if (rc < 0) {
-			dev_err(chip->dev, "Couldn't set SMBCHGL_OTG_CFG rc=%d\n",
-				rc);
-		}
-
 	}
 
 	if (chip->otg_pinctrl) {
@@ -8679,7 +8648,6 @@ static int smbchg_probe(struct spmi_device *spmi)
 		goto votables_cleanup;
 	}
 
-	chip->hvdcp_not_supported = true;
 	rc = smbchg_check_chg_version(chip);
 	if (rc) {
 		pr_err("Unable to check schg version rc=%d\n", rc);
