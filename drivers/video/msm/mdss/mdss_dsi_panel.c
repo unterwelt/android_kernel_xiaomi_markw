@@ -24,19 +24,10 @@
 #include <linux/string.h>
 #include <linux/display_state.h>
 
-#include <linux/display_state.h>
-
 #include "mdss_dsi.h"
 #ifdef TARGET_HW_MDSS_HDMI
 #include "mdss_dba_utils.h"
 #endif
-
-#include "mdss_livedisplay.h"
-
-#ifdef CONFIG_POWERSUSPEND
-#include <linux/powersuspend.h>
-#endif
-
 #include "mdss_livedisplay.h"
 
 #define DT_CMD_HDR 6
@@ -358,6 +349,11 @@ disp_en_gpio_err:
 	return rc;
 }
 
+#ifdef CONFIG_MACH_XIAOMI_TISSOT
+extern int ft8716_suspend;
+extern int panel_suspend_reset_flag;
+#endif
+
 int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
@@ -499,7 +495,22 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 			gpio_free(ctrl_pdata->disp_en_gpio);
 		}
-		gpio_set_value((ctrl_pdata->rst_gpio), 0);
+
+#ifdef CONFIG_MACH_XIAOMI_TISSOT
+		if (panel_suspend_reset_flag == 2 || (panel_suspend_reset_flag == 3 && ft8716_gesture_func_on == 0)
+			|| ft8716_suspend) {
+				gpio_set_value((ctrl_pdata->rst_gpio), 1);
+				mdelay(10);
+				gpio_set_value((ctrl_pdata->rst_gpio), 0);
+				mdelay(10);
+				gpio_set_value((ctrl_pdata->rst_gpio), 1);
+				mdelay(10);
+				gpio_set_value((ctrl_pdata->rst_gpio), 0);
+				mdelay(10);
+		} else
+#endif
+				gpio_set_value((ctrl_pdata->rst_gpio), 0);
+
 		gpio_free(ctrl_pdata->rst_gpio);
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
@@ -559,8 +570,8 @@ static char paset[] = {0x2b, 0x00, 0x00, 0x05, 0x00};	/* DTYPE_DCS_LWRITE */
 
 /* pack into one frame before sent */
 static struct dsi_cmd_desc set_col_page_addr_cmd[] = {
-	{{DTYPE_DCS_LWRITE, 0, 0, 0, 0, sizeof(caset)}, caset},	/* packed */
-	{{DTYPE_DCS_LWRITE, 1, 0, 0, 0, sizeof(paset)}, paset},
+	{{DTYPE_DCS_LWRITE, 0, 0, 0, 1, sizeof(caset)}, caset},	/* packed */
+	{{DTYPE_DCS_LWRITE, 1, 0, 0, 1, sizeof(paset)}, paset},
 };
 
 static void mdss_dsi_send_col_page_addr(struct mdss_dsi_ctrl_pdata *ctrl,
@@ -880,13 +891,6 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 		return -EINVAL;
 	}
 
-
-	display_on = true;
-
-	#ifdef CONFIG_POWERSUSPEND
-		set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
-	#endif
-
 	pinfo = &pdata->panel_info;
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
@@ -1021,16 +1025,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 	if (ctrl->off_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds, CMD_REQ_COMMIT);
 
-	if (ctrl->ds_registered && pinfo->is_pluggable) {
-		mdss_dba_utils_video_off(pinfo->dba_data);
-		mdss_dba_utils_hdcp_enable(pinfo->dba_data, false);
-	}
-
-#ifdef CONFIG_POWERSUSPEND
-	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
-#endif
-
-	display_on = false;
+	mdss_dsi_panel_off_hdmi(ctrl, pinfo);
 
 	display_on = false;
 
@@ -1976,6 +1971,10 @@ static void mdss_dsi_parse_esd_params(struct device_node *np,
 				pr_err("TE-ESD not valid for video mode\n");
 				goto error;
 			}
+#ifdef CONFIG_MACH_XIAOMI_MIDO
+		} else if (!strcmp(string, "TE_check_NT35596")) {
+			ctrl->status_mode = ESD_TE_NT35596;
+#endif
 		} else {
 			pr_err("No valid panel-status-check-mode string\n");
 			goto error;

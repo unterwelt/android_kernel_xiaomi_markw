@@ -9815,6 +9815,16 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
 
          hdd_set_conparam( 1 );
 
+         // Workqueue which gets scheduled in IPv4 notification callback.
+         vos_init_work(&pAdapter->ipv4NotifierWorkQueue,
+                       hdd_ipv4_notifier_work_queue);
+
+#ifdef WLAN_NS_OFFLOAD
+         // Workqueue which gets scheduled in IPv6 notification callback.
+         vos_init_work(&pAdapter->ipv6NotifierWorkQueue,
+                       hdd_ipv6_notifier_work_queue);
+#endif
+
          if (WLAN_HDD_P2P_GO == session_type)
          {
              /* Initialize the work queue to
@@ -10488,6 +10498,12 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
             pAdapter->sessionCtx.ap.beacon = NULL;
          }
          mutex_unlock(&pHddCtx->sap_lock);
+
+#ifdef WLAN_NS_OFFLOAD
+         vos_flush_work(&pAdapter->ipv6NotifierWorkQueue);
+#endif
+         vos_flush_work(&pAdapter->ipv4NotifierWorkQueue);
+
          break;
 
       case WLAN_HDD_MONITOR:
@@ -13725,6 +13741,22 @@ int hdd_wlan_startup(struct device *dev )
    }
    {
       eHalStatus halStatus;
+
+      /* Overwrite the Mac address if config file exist */
+      if (VOS_STATUS_SUCCESS != hdd_update_mac_config(pHddCtx))
+      {
+         hddLog(VOS_TRACE_LEVEL_WARN,
+                "%s: Didn't overwrite MAC from config file",
+                __func__);
+      } else {
+         pr_info("%s: WLAN Mac Addr from config: %02X:%02X:%02X:%02X:%02X:%02X\n", WLAN_MODULE_NAME,
+                 pHddCtx->cfg_ini->intfMacAddr[0].bytes[0],
+                 pHddCtx->cfg_ini->intfMacAddr[0].bytes[1],
+                 pHddCtx->cfg_ini->intfMacAddr[0].bytes[2],
+                 pHddCtx->cfg_ini->intfMacAddr[0].bytes[3],
+                 pHddCtx->cfg_ini->intfMacAddr[0].bytes[4],
+                 pHddCtx->cfg_ini->intfMacAddr[0].bytes[5]);
+      }
 
       /* Set the MAC Address Currently this is used by HAL to
        * add self sta. Remove this once self sta is added as

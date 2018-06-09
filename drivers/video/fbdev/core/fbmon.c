@@ -608,6 +608,9 @@ static struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
 	int num = 0, i, first = 1;
 	int ver, rev;
 
+	ver = edid[EDID_STRUCT_VERSION];
+	rev = edid[EDID_STRUCT_REVISION];
+
 	mode = kzalloc(50 * sizeof(struct fb_videomode), GFP_KERNEL);
 	if (mode == NULL)
 		return NULL;
@@ -617,9 +620,6 @@ static struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
 		kfree(mode);
 		return NULL;
 	}
-
-	ver = edid[EDID_STRUCT_VERSION];
-	rev = edid[EDID_STRUCT_REVISION];
 
 	*dbsize = 0;
 
@@ -1462,9 +1462,7 @@ int of_get_fb_videomode(struct device_node *np, struct fb_videomode *fb,
 	if (ret)
 		return ret;
 
-	ret = fb_videomode_from_videomode(&vm, fb);
-	if (ret)
-		return ret;
+	fb_videomode_from_videomode(&vm, fb);
 
 	pr_debug("%s: got %dx%d display mode from %s\n",
 		of_node_full_name(np), vm.hactive, vm.vactive, np->name);

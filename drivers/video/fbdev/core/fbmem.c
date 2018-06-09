@@ -1061,6 +1061,14 @@ fb_blank(struct fb_info *info, int blank)
  	if (blank > FB_BLANK_POWERDOWN)
  		blank = FB_BLANK_POWERDOWN;
 
+#ifdef CONFIG_MACH_XIAOMI_TISSOT
+	if (info->blank == blank) {
+		if (info->fbops->fb_blank)
+			ret = info->fbops->fb_blank(blank, info);
+		return ret;
+	}
+#endif
+
 	event.info = info;
 	event.data = &blank;
 
@@ -1079,6 +1087,11 @@ fb_blank(struct fb_info *info, int blank)
 		if (!early_ret)
 			fb_notifier_call_chain(FB_R_EARLY_EVENT_BLANK, &event);
 	}
+
+#ifdef CONFIG_MACH_XIAOMI_TISSOT
+	if (!ret)
+		info->blank = blank;
+#endif
 
  	return ret;
 }
@@ -1641,6 +1654,9 @@ static int do_register_framebuffer(struct fb_info *fb_info)
 		if (!registered_fb[i])
 			break;
 	fb_info->node = i;
+#ifdef CONFIG_MACH_XIAOMI_TISSOT
+	fb_info->blank = -1;
+#endif
 	atomic_set(&fb_info->count, 1);
 	mutex_init(&fb_info->lock);
 	mutex_init(&fb_info->mm_lock);
@@ -1856,31 +1872,17 @@ EXPORT_SYMBOL(fb_set_suspend);
 static int __init
 fbmem_init(void)
 {
-	int ret;
+	proc_create("fb", 0, NULL, &fb_proc_fops);
 
-	if (!proc_create("fb", 0, NULL, &fb_proc_fops))
-		return -ENOMEM;
-
-	ret = register_chrdev(FB_MAJOR, "fb", &fb_fops);
-	if (ret) {
+	if (register_chrdev(FB_MAJOR,"fb",&fb_fops))
 		printk("unable to get major %d for fb devs\n", FB_MAJOR);
-		goto err_chrdev;
-	}
 
 	fb_class = class_create(THIS_MODULE, "graphics");
 	if (IS_ERR(fb_class)) {
-		ret = PTR_ERR(fb_class);
-		pr_warn("Unable to create fb class; errno = %d\n", ret);
+		printk(KERN_WARNING "Unable to create fb class; errno = %ld\n", PTR_ERR(fb_class));
 		fb_class = NULL;
-		goto err_class;
 	}
 	return 0;
-
-err_class:
-	unregister_chrdev(FB_MAJOR, "fb");
-err_chrdev:
-	remove_proc_entry("fb", NULL);
-	return ret;
 }
 
 #ifdef MODULE

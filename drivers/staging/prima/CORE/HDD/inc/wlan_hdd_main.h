@@ -31,17 +31,17 @@
 #if !defined( WLAN_HDD_MAIN_H )
 #define WLAN_HDD_MAIN_H
 /**===========================================================================
-
+  
   \file  WLAN_HDD_MAIN_H.h
-
+  
   \brief Linux HDD Adapter Type
-
+  
   ==========================================================================*/
-
-/*---------------------------------------------------------------------------
+  
+/*--------------------------------------------------------------------------- 
   Include files
-  -------------------------------------------------------------------------*/
-
+  -------------------------------------------------------------------------*/ 
+  
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/cfg80211.h>
@@ -71,7 +71,7 @@
 
 #include <linux/proc_fs.h> /* Necessary because we use the proc fs */
 #include <linux/fs.h>
-/*---------------------------------------------------------------------------
+/*--------------------------------------------------------------------------- 
   Preprocessor definitions and constants
   -------------------------------------------------------------------------*/
 
@@ -107,9 +107,9 @@
 #define LIBRA_HW_NEEDED_HEADROOM   128
 /** Hdd Tx Time out value */
 #ifdef LIBRA_LINUX_PC
-#define HDD_TX_TIMEOUT          (8000)
+#define HDD_TX_TIMEOUT          (8000)       
 #else
-#define HDD_TX_TIMEOUT          msecs_to_jiffies(5000)
+#define HDD_TX_TIMEOUT          msecs_to_jiffies(5000)    
 #endif
 /** Hdd Default MTU */
 #define HDD_DEFAULT_MTU         (1500)
@@ -476,10 +476,10 @@ typedef struct hdd_stats_s
 typedef enum
 {
    HDD_ROAM_STATE_NONE,
-
-   // Issuing a disconnect due to transition into low power states.
+   
+   // Issuing a disconnect due to transition into low power states.  
    HDD_ROAM_STATE_DISCONNECTING_POWER,
-
+   
    // move to this state when HDD sets a key with SME/CSR.  Note this is
    // an important state to get right because we will get calls into our SME
    // callback routine for SetKey activity that we did not initiate!
@@ -503,7 +503,7 @@ typedef struct roaming_info_s
    tANI_U32 roamId;
    eRoamCmdStatus roamStatus;
    v_BOOL_t deferKeyComplete;
-
+   
 } roaming_info_t;
 
 #ifdef FEATURE_WLAN_WAPI
@@ -738,7 +738,7 @@ typedef enum {
     WLAN_HDD_ACTION_FRM_TYPE_MAX = 255,
 }tActionFrmType;
 
-typedef struct hdd_cfg80211_state_s
+typedef struct hdd_cfg80211_state_s 
 {
   tANI_U16 current_freq;
   u64 action_cookie;
@@ -831,6 +831,8 @@ struct hdd_station_ctx
    /**Connection information*/
    connection_info_t conn_info;
 
+   connection_info_t cache_conn_info;
+
    roaming_info_t roam_info;
 
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
@@ -852,14 +854,14 @@ struct hdd_station_ctx
 
 };
 
-#define BSS_STOP    0
+#define BSS_STOP    0 
 #define BSS_START   1
 typedef struct hdd_hostapd_state_s
 {
     int bssState;
     vos_event_t vosEvent;
     VOS_STATUS vosStatus;
-    v_BOOL_t bCommit;
+    v_BOOL_t bCommit; 
 
 } hdd_hostapd_state_t;
 
@@ -966,19 +968,19 @@ struct hdd_ap_ctx_s
    tsap_Config_t sapConfig;
 
    struct semaphore semWpsPBCOverlapInd;
-
+   
    v_BOOL_t apDisableIntraBssFwd;
-
+      
    vos_timer_t hdd_ap_inactivity_timer;
 
    v_U8_t   operatingChannel;
-
+   
    v_BOOL_t uIsAuthenticated;
 
    eCsrEncryptionType ucEncryptType;
-
-   //This will point to group key data, if it is received before start bss.
-   tCsrRoamSetKey groupKey;
+   
+   //This will point to group key data, if it is received before start bss. 
+   tCsrRoamSetKey groupKey; 
    // This will have WEP key data, if it is received before start bss
    tCsrRoamSetKey wepKey[CSR_MAX_NUM_KEY];
 
@@ -1012,7 +1014,7 @@ struct hdd_mon_ctx_s
 typedef struct hdd_scaninfo_s
 {
    /* The scan id  */
-   v_U32_t scanId;
+   v_U32_t scanId; 
 
    /* The scan pending  */
    v_U32_t mScanPending;
@@ -1025,7 +1027,7 @@ typedef struct hdd_scaninfo_s
    v_U32_t waitScanResult;
 
    /* Additional IE for scan */
-   tSirAddie scanAddIE;
+   tSirAddie scanAddIE; 
 
    /* Scan mode*/
    tSirScanType scan_mode;
@@ -1151,7 +1153,7 @@ struct hdd_adapter_s
 {
    void *pHddCtx;
 
-   device_mode_t device_mode;
+   device_mode_t device_mode; 
 
    /** Handle to the network device */
    struct net_device *dev;
@@ -1160,25 +1162,25 @@ struct hdd_adapter_s
    /** IPv6 notifier callback for handling NS offload on change in IP */
    struct work_struct  ipv6NotifierWorkQueue;
 #endif
-
+    
    /** IPv4 notifier callback for handling ARP offload on change in IP */
    struct work_struct  ipv4NotifierWorkQueue;
 
    //TODO Move this to sta Ctx
    struct wireless_dev wdev ;
-   struct cfg80211_scan_request *request ;
+   struct cfg80211_scan_request *request ; 
 
    /** ops checks if Opportunistic Power Save is Enable or Not
-    * ctw stores ctWindow value once we receive Opps command from
-    * wpa_supplicant then using ctWindow value we need to Enable
+    * ctw stores ctWindow value once we receive Opps command from 
+    * wpa_supplicant then using ctWindow value we need to Enable 
     * Opportunistic Power Save
     */
     tANI_U8  ops;
     tANI_U32 ctw;
 
-   /** Current MAC Address for the adapter  */
-   v_MACADDR_t macAddressCurrent;
-
+   /** Current MAC Address for the adapter  */       
+   v_MACADDR_t macAddressCurrent;    
+      
    /**Event Flags*/
    unsigned long event_flags;
 
@@ -1188,7 +1190,7 @@ struct hdd_adapter_s
    hdd_stats_t hdd_stats;
    /**Mib information*/
    sHddMib_t  hdd_mib;
-
+           
    tANI_U8 sessionId;
 
    /* Completion variable for session close */
@@ -1197,7 +1199,7 @@ struct hdd_adapter_s
    /* Completion variable for session open */
    struct completion session_open_comp_var;
 
-   //TODO: move these to sta ctx. These may not be used in AP
+   //TODO: move these to sta ctx. These may not be used in AP 
    /** completion variable for disconnect callback */
    struct completion disconnect_comp_var;
 
@@ -1257,7 +1259,7 @@ struct hdd_adapter_s
 
    /**Track whether 3/4th of resources are used */
    v_BOOL_t isVosLowResource;
-
+  
    /**Track whether OS TX queue has been disabled.*/
    v_BOOL_t isTxSuspended[NUM_TX_QUEUES];
 
@@ -1586,30 +1588,30 @@ struct hdd_context_s
 
    /** Pointer for firmware image data */
    const struct firmware *fw;
-
+   
    /** Pointer for configuration data */
    const struct firmware *cfg;
-
+   
    /** Pointer for nv data */
    const struct firmware *nv;
-
+   
    /** Pointer to the parent device */
    struct device *parent_dev;
 
    pid_t  pid_sdio_claimed;
    atomic_t sdio_claim_count;
 
-   /** Config values read from qcom_cfg.ini file */
+   /** Config values read from qcom_cfg.ini file */ 
    hdd_config_t *cfg_ini;
-   wlan_hdd_ftm_status_t ftm;
+   wlan_hdd_ftm_status_t ftm; 
    /** completion variable for full power callback */
    struct completion full_pwr_comp_var;
    /** completion variable for Request BMPS callback */
    struct completion req_bmps_comp_var;
-
+   
    /** completion variable for standby callback */
    struct completion standby_comp_var;
-
+   
    /* Completion  variable to indicate Rx Thread Suspended */
    struct completion rx_sus_event_var;
 
@@ -1643,26 +1645,26 @@ struct hdd_context_s
    struct completion ssr_comp_var;
 
    v_U8_t isLoadUnloadInProgress;
-
+   
    /**Track whether driver has been suspended.*/
    hdd_ps_state_t hdd_ps_state;
-
+   
    /* Track whether Mcast/Bcast Filter is enabled.*/
    v_BOOL_t hdd_mcastbcast_filter_set;
 
    /* Track whether ignore DTIM is enabled*/
    v_BOOL_t hdd_ignore_dtim_enabled;
    v_U32_t hdd_actual_ignore_DTIM_value;
-   v_U32_t hdd_actual_LI_value;
+   v_U32_t hdd_actual_LI_value; 
 
-
+   
    v_BOOL_t hdd_wlan_suspended;
    bool rx_wow_dump;
 
    uint8_t bad_sta[HDD_MAX_STA_COUNT];
-
+   
    spinlock_t filter_lock;
-
+   
    /* Lock to avoid race condtion during start/stop bss*/
    struct mutex sap_lock;
 
@@ -1699,10 +1701,10 @@ struct hdd_context_s
    hdd_chip_reset_stats_t hddChipResetStats;
    /* Number of times riva restarted */
    v_U32_t  hddRivaResetStats;
-
+   
    /* Can we allow AMP connection right now*/
    v_BOOL_t isAmpAllowed;
-
+   
    /** P2P Device MAC Address for the adapter  */
    v_MACADDR_t p2pDeviceAddress;
 
@@ -1713,8 +1715,8 @@ struct hdd_context_s
     vos_wake_lock_t rx_wake_lock;
 #endif
 
-   /*
-    * Framework initiated driver restarting
+   /* 
+    * Framework initiated driver restarting 
     *    hdd_reload_timer   : Restart retry timer
     *    isRestartInProgress: Restart in progress
     *    hdd_restart_retries: Restart retries
@@ -1723,7 +1725,7 @@ struct hdd_context_s
    vos_timer_t hdd_restart_timer;
    atomic_t isRestartInProgress;
    u_int8_t hdd_restart_retries;
-
+   
    hdd_scaninfo_t scan_info;
 
    /*is_dyanmic_channel_range_set is set to 1 when Softap_set_channel_range
@@ -1939,7 +1941,7 @@ struct hdd_mdns_resp_matched {
 };
 #endif /* MDNS_OFFLOAD */
 
-/*---------------------------------------------------------------------------
+/*--------------------------------------------------------------------------- 
   Function declarations and documenation
   -------------------------------------------------------------------------*/
 const char * hdd_device_modetoString(v_U8_t device_mode);

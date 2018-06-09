@@ -9901,7 +9901,7 @@ void WDA_ExitImpsReqCallback(WDI_Status status, void* pUserData)
        {
            VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
                   FL("reload wlan driver"));
-           wpalWlanReload();
+           wpalWlanReload(VOS_WDI_FAILURE);
        }
    }
    return;
@@ -11666,9 +11666,11 @@ VOS_STATUS WDA_ProcessWlanSuspendInd(tWDA_CbContext *pWDA,
    wdiSuspendParams.wdiReqStatusCB = WDA_ProcessWlanSuspendIndCallback;
 
    pWdaParams = (tWDA_ReqParams *)vos_mem_malloc(sizeof(tWDA_ReqParams));
-   if (!pWdaParams)
+   if (!pWdaParams) {
        VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
-                                          "%s memory allocation failed" ,__func__);
+                  "%s memory allocation failed" ,__func__);
+       return VOS_STATUS_E_FAILURE;
+   }
    pWdaParams->pWdaContext = pWDA;
    pWdaParams->wdaMsgParam = pWlanSuspendParam;
    wdiSuspendParams.pUserData = pWdaParams;
@@ -12487,6 +12489,7 @@ VOS_STATUS WDA_ProcessKeepAliveReq(tWDA_CbContext *pWDA,
          sizeof(WDI_KeepAliveReqParamsType)) ;
    tWDA_ReqParams *pWdaParams;
 
+    vos_mem_zero(wdiKeepAliveInfo, sizeof(WDI_KeepAliveReqParamsType));
     VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_INFO,
                                           "------> %s " ,__func__);
     if(NULL == wdiKeepAliveInfo) 
@@ -14989,7 +14992,7 @@ VOS_STATUS WDA_TxPacket(tWDA_CbContext *pWDA,
 
    /* Divert Disassoc/Deauth frames thru self station, as by the time unicast
       disassoc frame reaches the HW, HAL has already deleted the peer station */
-   if ((pFc->type == SIR_MAC_MGMT_FRAME))
+   if (pFc->type == SIR_MAC_MGMT_FRAME)
    {
        if ((pFc->subType == SIR_MAC_MGMT_REASSOC_RSP) ||
                (pFc->subType == SIR_MAC_MGMT_PROBE_REQ))
@@ -15112,7 +15115,7 @@ VOS_STATUS WDA_TxPacket(tWDA_CbContext *pWDA,
       {
          VOS_TRACE(VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
                    "%s: Request system recovery", __func__);
-         vos_wlanRestart();
+         vos_wlanRestart(VOS_TRANSMISSIONS_TIMEOUT);
       }
       status = VOS_STATUS_E_FAILURE;
    }
@@ -15624,6 +15627,11 @@ VOS_STATUS  WDA_Process_apfind_set_cmd(tWDA_CbContext *pWDA,
 
     wdi_ap_find_cmd = (struct WDI_APFind_cmd *)vos_mem_malloc(
             sizeof(struct hal_apfind_request) + ap_find_req->request_data_len);
+    if (!wdi_ap_find_cmd) {
+        VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
+                   "%s memory allocation failed" ,__func__);
+        return VOS_STATUS_E_FAILURE;
+    }
 
     wdi_ap_find_cmd->data_len = ap_find_req->request_data_len;
     vos_mem_copy(wdi_ap_find_cmd->data, ap_find_req->request_data,
@@ -15928,7 +15936,7 @@ VOS_STATUS WDA_ProcessFwrMemDumpReq(tWDA_CbContext * pWDA,
    /* Store param pointer as passed in by caller */
    pWdaParams->wdaMsgParam = pFwrMemDumpReq;
 
-   status = WDI_FwrMemDumpReq(pWdiFwrMemDumpReq,
+   wstatus = WDI_FwrMemDumpReq(pWdiFwrMemDumpReq,
                               (WDI_FwrMemDumpCb)WDA_FwrMemDumpRespCallback,
                               pWdaParams);
 
