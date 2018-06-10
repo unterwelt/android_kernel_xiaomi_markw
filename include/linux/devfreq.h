@@ -180,6 +180,7 @@ struct devfreq {
 	unsigned long last_stat_updated;
 
 	bool do_wake_boost;
+	bool needs_wake_boost;
 };
 
 #if defined(CONFIG_PM_DEVFREQ)
@@ -303,3 +304,4 @@ static inline void devm_devfreq_unregister_opp_notifier(struct device *dev,
 #endif /* CONFIG_PM_DEVFREQ */
 
 #endif /* __LINUX_DEVFREQ_H__ */
+
