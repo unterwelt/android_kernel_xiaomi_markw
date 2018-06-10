@@ -45,7 +45,6 @@
 #include <linux/fb.h>
 #include <linux/pm_qos.h>
 #include <linux/cpufreq.h>
-#include <linux/display_state.h>
 
 #include "gf_spi.h"
 
@@ -346,15 +345,8 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 					input_report_key(gf_dev->input, KEY_SELECT, gf_key.value);
 					input_sync(gf_dev->input);
 				} else {
-					if (!is_display_on()) {
-						sched_set_boost(1);
-						input_report_key(gf_dev->input, gf_key.key, gf_key.value);
-						input_sync(gf_dev->input);
-						sched_set_boost(0);
-					} else {
-						input_report_key(gf_dev->input, gf_key.key, gf_key.value);
-						input_sync(gf_dev->input);
-					}
+					input_report_key(gf_dev->input, gf_key.key, gf_key.value);
+					input_sync(gf_dev->input);
 				}
 				break;
 			}
@@ -680,7 +672,7 @@ static int gf_probe(struct platform_device *pdev)
 	gf_dev->pwr_gpio 	= 	-EINVAL;
 	gf_dev->device_available =  0;
 	gf_dev->fb_black  =  0;
-	gf_dev->irq_enabled = 1;
+	gf_dev->irq_enabled = 0;
 	gf_dev->fingerprint_pinctrl = NULL;
 
 	/* If we can allocate a minor number, hook up this device.
@@ -777,10 +769,9 @@ static int gf_remove(struct platform_device *pdev)
 	if (gf_dev->irq)
 		free_irq(gf_dev->irq, gf_dev);
 
-	if (gf_dev->input != NULL) {
+	if (gf_dev->input != NULL)
 		input_unregister_device(gf_dev->input);
 		input_free_device(gf_dev->input);
-	}
 
 	/* prevent new opens */
 	mutex_lock(&device_list_lock);
@@ -790,7 +781,7 @@ static int gf_remove(struct platform_device *pdev)
 	if (gf_dev->users == 0)
 		kfree(gf_dev);
 
-	mutex_unlock(&device_list_lock);
+		mutex_unlock(&device_list_lock);
 
 	wake_lock_destroy(&gf_dev->ttw_wl);
 
