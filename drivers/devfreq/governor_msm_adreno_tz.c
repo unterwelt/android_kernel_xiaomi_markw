@@ -20,7 +20,7 @@
 #include <linux/ftrace.h>
 #include <linux/mm.h>
 #include <linux/msm_adreno_devfreq.h>
-#include <linux/display_state.h>
+#include <linux/state_notifier.h>
 #include <asm/cacheflush.h>
 #include <soc/qcom/scm.h>
 #include "governor.h"
@@ -73,7 +73,7 @@ static void do_partner_stop_event(struct work_struct *work);
 static void do_partner_suspend_event(struct work_struct *work);
 static void do_partner_resume_event(struct work_struct *work);
 
-/* Display and suspend state booleans */
+/* Display and suspend state booleans */ 
 static bool display_on;
 static bool suspended = false;
 
@@ -110,13 +110,12 @@ static ssize_t adrenoboost_show(struct device *dev,
 static ssize_t adrenoboost_save(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	int input;
+	unsigned int input;
 	sscanf(buf, "%d ", &input);
-	if (input < 0 || input > 3) {
+	if (input > 3)
 		adrenoboost = 0;
-	} else {
+	else
 		adrenoboost = input;
-	}
 
 	return count;
 }
@@ -379,37 +378,47 @@ static int tz_init(struct devfreq_msm_adreno_tz_data *priv,
 
 	return ret;
 }
+
 #ifdef CONFIG_ADRENO_IDLER
 extern int adreno_idler(struct devfreq_dev_status stats, struct devfreq *devfreq,
 		 unsigned long *freq);
 #endif
 
 #if 1
-
-// mapping gpu level calculated linear conservation half curve values into a
-// bell curve of conservation  (lower is higher freq level)
+static int adrenoboost_debug(struct devfreq *devfreq, unsigned long *freq,
+				int jump_dir);
+/*
+* mapping gpu level calculated linear conservation half curve
+* values into a bell curve of conservation (lower is higher freq level)
+*/
 static int conservation_map_up[] = {15,15,10,4,5,6,12     ,5,5,5};
 static int conservation_map_down[] = {0,1,6,6,5,0,0     ,5,5,5};
 
-// make boost multiplication/division depending on current lvl, dampen the high freq up scaling! (lower is higher freq level)
+/*
+* make boost multiplication/division depending on current lvl,
+* dampen the high freq up scaling! (lower is higher freq level)
+*/
 static int lvl_multiplicator_map_1[] = {5,5,6,8,9,1,1    ,1,1};
 static int lvl_divider_map_1[] = {10,10,10,10,10,1,1    ,1,1};
 
-// for boost == 2 -- boost divide on the low spectrum, dampen the lower freq values, unneeded to boost the low freq spectrum so much at start
+/*
+* for boost == 2 -- boost divide on the low spectrum,
+* dampen the lower freq values, unneeded to boost the
+* low freq spectrum so much at start
+*/
 static int lvl_multiplicator_map_2[] = {6,7,8,1,1,1,1    ,1,1};
 static int lvl_divider_map_2[] = {10,10,10,1,1,1,1    ,1,1};
 
-// for boost == 3 -- boost divide on the low spectrum, dampen the lower freq values, unneeded to boost the low freq spectrum so much at start
+/*
+* for boost == 3 -- boost divide on the low spectrum,
+* dampen the lower freq values, unneeded to boost the 
+* low freq spectrum so much at start
+*/
 static int lvl_multiplicator_map_3[] = {9,1,1,1,1,10,8    ,1,1};
 static int lvl_divider_map_3[] = {10,1,1,1,1,14,12    ,1,1};
 
 #endif
 
-#ifdef CONFIG_SIMPLE_GPU_ALGORITHM
-extern int simple_gpu_active;
-extern int simple_gpu_algorithm(int level, int *val,
-				struct devfreq_msm_adreno_tz_data *priv);
-#endif
 static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 				u32 *flag)
 {
@@ -431,21 +440,20 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 		return result;
 	}
 
-		/* Prevent overflow */
-		if (stats.busy_time >= (1 << 24) || stats.total_time >= (1 << 24)) {
-			stats.busy_time >>= 7;
-			stats.total_time >>= 7;
-		}
+	/* Prevent overflow */
+	if (stats.busy_time >= (1 << 24) || stats.total_time >= (1 << 24)) {
+		stats.busy_time >>= 7;
+		stats.total_time >>= 7;
+	}
 
 	*freq = stats.current_frequency;
 
-	#ifdef CONFIG_ADRENO_IDLER
-		if (adreno_idler(stats, devfreq, freq)) {
-			/* adreno_idler has asked to bail out now */
-			return 0;
-		}
-	#endif
-
+#ifdef CONFIG_ADRENO_IDLER
+	if (adreno_idler(stats, devfreq, freq)) {
+		/* adreno_idler has asked to bail out now */
+		return 0;
+	}
+#endif
 	/*
 	 * Force to use & record as min freq when system has
 	 * entered pm-suspend or screen-off state.
@@ -457,19 +465,36 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 
 	priv->bin.total_time += stats.total_time;
 #if 1
-	// scale busy time up based on adrenoboost parameter, only if MIN_BUSY exceeded...
-//	if ((unsigned int)(priv->bin.busy_time + stats.busy_time) >= MIN_BUSY && adrenoboost) {
-	if (adrenoboost) {
-		if (adrenoboost == 1) {
-			priv->bin.busy_time += (unsigned int)((stats.busy_time * ( 1 + adrenoboost ) * lvl_multiplicator_map_1[ last_level ]) / lvl_divider_map_1[ last_level ]);
-		} else
-		if (adrenoboost == 2) {
-			priv->bin.busy_time += (unsigned int)((stats.busy_time * ( 1 + adrenoboost ) * lvl_multiplicator_map_2[ last_level ]  * 7 ) / (lvl_divider_map_2[ last_level ] * 10));
-		} else {
-			priv->bin.busy_time += (unsigned int)((stats.busy_time * ( 1 + adrenoboost ) * lvl_multiplicator_map_3[ last_level ]  * 8 ) / (lvl_divider_map_3[ last_level ] * 10));
-		}
-	} else {
+	/*
+	* scale busy time up based on adrenoboost parameter,
+	* only if MIN_BUSY exceeded...
+	*/
+	/*
+	if ((unsigned int)(priv->bin.busy_time + stats.busy_time)
+	>= MIN_BUSY && adrenoboost) {
+	*/
+	switch (adrenoboost) {
+		case 1:
+			priv->bin.busy_time += (unsigned int)
+				((stats.busy_time * (1 + adrenoboost) *
+				lvl_multiplicator_map_1[last_level]) /
+				lvl_divider_map_1[last_level]);
+		break;
+		case 2:
+			priv->bin.busy_time += (unsigned int)
+				((stats.busy_time * (1 + adrenoboost) *
+				lvl_multiplicator_map_2[last_level]  * 7 ) /
+				(lvl_divider_map_2[last_level] * 10));
+		break;
+		case 3:
+			priv->bin.busy_time += (unsigned int)
+				((stats.busy_time * (1 + adrenoboost) *
+				lvl_multiplicator_map_3[last_level] * 8 ) /
+				(lvl_divider_map_3[last_level] * 10));
+		break;
+		default:
 		priv->bin.busy_time += stats.busy_time;
+		break;
 	}
 #else
 	priv->bin.busy_time += stats.busy_time;
@@ -506,25 +531,13 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 			priv->bin.busy_time > CEILING) {
 		val = -1 * level;
 	} else {
-#ifdef CONFIG_SIMPLE_GPU_ALGORITHM
-		if (simple_gpu_active) {
-			simple_gpu_algorithm(level, &val, priv);
-		} else {
-			scm_data[0] = level;
-			scm_data[1] = priv->bin.total_time;
-			scm_data[2] = priv->bin.busy_time;
-			scm_data[3] = context_count;
-			__secure_tz_update_entry3(scm_data, sizeof(scm_data),
-						&val, sizeof(val), priv);
-		}
-#else
+
 		scm_data[0] = level;
 		scm_data[1] = priv->bin.total_time;
 		scm_data[2] = priv->bin.busy_time;
 		scm_data[3] = context_count;
 		__secure_tz_update_entry3(scm_data, sizeof(scm_data),
 					&val, sizeof(val), priv);
-#endif
 	}
 #if 0
 	priv->bin.total_time = 0;
@@ -540,18 +553,28 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 		level += val;
 		level = max(level, 0);
 		level = min_t(int, level, devfreq->profile->max_state - 1);
-		pr_debug("%s ADRENO jumping level = %d last_level = %d total=%d busy=%d original busy_time=%d \n", __func__, level, priv->bin.last_level, (int)priv->bin.total_time, (int)priv->bin.busy_time, (int)stats.busy_time);
+		adrenoboost_debug(devfreq, freq, 0);
 		priv->bin.last_level = level;
 	} else {
 		if (val) {
-			priv->bin.cycles_keeping_level += 1 + abs(val/2); // higher value change quantity means more addition to cycles_keeping_level for easier switching
-			// going upwards in frequency -- make it harder on the low and high freqs, middle ground - let it move
-			if (val<0 && priv->bin.cycles_keeping_level < conservation_map_up[ last_level ]) {
-				pr_debug("%s ADRENO not jumping UP level = %d last_level = %d total=%d busy=%d original busy_time=%d \n", __func__, level, priv->bin.last_level, (int)priv->bin.total_time, (int)priv->bin.busy_time, (int)stats.busy_time);
+			priv->bin.cycles_keeping_level += 1 + abs(val/2);
+			/*
+			* higher value change quantity means more
+			* addition to cycles_keeping_level for easier switching.
+			* going upwards in frequency -- make it harder on the low
+			* and high freqs, middle ground - let it move
+			*/
+			if (val<0 && priv->bin.cycles_keeping_level <
+				conservation_map_up[ last_level ]) {
+				adrenoboost_debug(devfreq, freq, 1);
 			} else
-			// going downwards in frequency let it happen hard in the middle freqs
-			if (val>0 && priv->bin.cycles_keeping_level < conservation_map_down[ last_level ])  {
-				pr_debug("%s ADRENO not jumping DOWN level = %d last_level = %d total=%d busy=%d original busy_time=%d \n", __func__, level, priv->bin.last_level, (int)priv->bin.total_time, (int)priv->bin.busy_time, (int)stats.busy_time);
+			/*
+			* going downwards in frequency let it happen hard in
+			* the middle freqs
+			*/
+			if (val>0 && priv->bin.cycles_keeping_level <
+				conservation_map_down[ last_level ])  {
+				adrenoboost_debug(devfreq, freq, 2);
 			} else
 			{
 				level += val;
@@ -561,7 +584,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 				priv->bin.cycles_keeping_level = 0;
 				// set new last level
 				priv->bin.last_level = level;
-				pr_debug("%s ADRENO jumping level = %d last_level = %d total=%d busy=%d original busy_time=%d \n", __func__, level, priv->bin.last_level, (int)priv->bin.total_time, (int)priv->bin.busy_time, (int)stats.busy_time);
+				adrenoboost_debug(devfreq, freq, 0);
 			}
 		}
 	}
@@ -578,6 +601,28 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 	*freq = devfreq->profile->freq_table[level];
 	return 0;
 }
+
+#if 1
+static int adrenoboost_debug(struct devfreq *devfreq, unsigned long *freq,
+						int jump_dir)
+{
+	struct devfreq_msm_adreno_tz_data *priv = devfreq->data;
+	struct devfreq_dev_status stats;
+	int val, level = 0;
+	int last_level = priv->bin.last_level;
+	if (!jump_dir)
+		pr_info("ADRENO jumping\n");
+	else if (jump_dir == 1)
+		pr_info("ADRENO NOT jumping UP\n");
+	else
+		pr_info("ADRENO NOT jumping DOWN\n");
+	pr_info("level = %d last_level = %d total=%d busy=%d original busy_time=%d\n",
+			level, priv->bin.last_level,
+			(int)priv->bin.total_time,
+			(int)priv->bin.busy_time, (int)stats.busy_time);
+	return 0;
+}
+#endif
 
 static int tz_notify(struct notifier_block *nb, unsigned long type, void *devp)
 {
@@ -688,7 +733,7 @@ static int tz_suspend(struct devfreq *devfreq)
 	struct devfreq_msm_adreno_tz_data *priv = devfreq->data;
 	unsigned int scm_data[2] = {0, 0};
 	__secure_tz_reset_entry2(scm_data, sizeof(scm_data), priv->is_64);
-	display_on = is_display_on();
+	display_on = !state_suspended;
 	suspended = true;
 
 	priv->bin.total_time = 0;
@@ -734,7 +779,7 @@ static int tz_handler(struct devfreq *devfreq, unsigned int event, void *data)
 	case DEVFREQ_GOV_RESUME:
 		spin_lock(&suspend_lock);
 		suspend_time += suspend_time_ms();
-		display_on = is_display_on();
+		display_on = !state_suspended;
 		suspended = false;
 		/* Reset the suspend_start when gpu resumes */
 		suspend_start = 0;

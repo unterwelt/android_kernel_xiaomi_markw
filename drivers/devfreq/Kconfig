@@ -1,5 +1,6 @@
 menuconfig PM_DEVFREQ
 	bool "Generic Dynamic Voltage and Frequency Scaling (DVFS) support"
+	select SRCU
 	help
 	  A device may have a list of frequencies and voltages available.
 	  devfreq, a generic DVFS framework can be registered for a device
@@ -78,12 +79,6 @@ config DEVFREQ_GOV_MSM_ADRENO_TZ
 	  Trustzone based governor for the Adreno GPU.
 	  Sets the frequency using a "on-demand" algorithm.
 	  This governor is unlikely to be useful for other devices.
-
-config SIMPLE_GPU_ALGORITHM
-	bool "Simple GPU algorithm"
-	depends on DEVFREQ_GOV_MSM_ADRENO_TZ
-	help
-	  Simple user configurable GPU controlling algorithm
 
 config MSM_BIMC_BWMON
 	tristate "MSM BIMC Bandwidth monitor hardware"
@@ -176,7 +171,7 @@ config DEVFREQ_GOV_MEMLAT
 	  monitor if it determines that a workload is memory latency bound. Since
 	  this uses target specific counters it can conflict with existing profiling
 	  tools.
-		
+	  
 config ADRENO_IDLER
 	tristate "MSM Adreno idler"
 	depends on DEVFREQ_GOV_MSM_ADRENO_TZ
