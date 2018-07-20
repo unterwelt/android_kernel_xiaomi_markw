@@ -2643,6 +2643,89 @@ u32 __weak get_freq_max_load(int cpu, u32 freq)
 	return 100;
 }
 
+DEFINE_PER_CPU(struct freq_max_load *, freq_max_load);
+static DEFINE_SPINLOCK(freq_max_load_lock);
+
+int sched_update_freq_max_load(const cpumask_t *cpumask)
+{
+	int i, cpu, ret;
+	unsigned int freq;
+	struct cpu_pstate_pwr *costs;
+	struct cpu_pwr_stats *per_cpu_info = get_cpu_pwr_stats();
+	struct freq_max_load *max_load, *old_max_load;
+	struct freq_max_load_entry *entry;
+	u64 max_demand_capacity, max_demand;
+	unsigned long flags;
+	u32 hfreq;
+	int hpct;
+
+	if (!per_cpu_info)
+		return 0;
+
+	spin_lock_irqsave(&freq_max_load_lock, flags);
+	max_demand_capacity = div64_u64(max_task_load(), max_possible_capacity);
+	for_each_cpu(cpu, cpumask) {
+		if (!per_cpu_info[cpu].ptable) {
+			ret = -EINVAL;
+			goto fail;
+		}
+
+		old_max_load = rcu_dereference(per_cpu(freq_max_load, cpu));
+
+		/*
+		 * allocate len + 1 and leave the last power cost as 0 for
+		 * power_cost() can stop iterating index when
+		 * per_cpu_info[cpu].len > len of max_load due to race between
+		 * cpu power stats update and get_cpu_pwr_stats().
+		 */
+		max_load = kzalloc(sizeof(struct freq_max_load) +
+				   sizeof(struct freq_max_load_entry) *
+				   (per_cpu_info[cpu].len + 1), GFP_ATOMIC);
+		if (unlikely(!max_load)) {
+			ret = -ENOMEM;
+			goto fail;
+		}
+
+		max_load->length = per_cpu_info[cpu].len;
+
+		max_demand = max_demand_capacity *
+			     cpu_max_possible_capacity(cpu);
+
+		i = 0;
+		costs = per_cpu_info[cpu].ptable;
+		while (costs[i].freq) {
+			entry = &max_load->freqs[i];
+			freq = costs[i].freq;
+			hpct = get_freq_max_load(cpu, freq);
+			if (hpct <= 0 && hpct > 100)
+				hpct = 100;
+			hfreq = div64_u64((u64)freq * hpct , 100);
+			entry->hdemand =
+			    div64_u64(max_demand * hfreq,
+				      cpu_max_possible_freq(cpu));
+			i++;
+		}
+
+		rcu_assign_pointer(per_cpu(freq_max_load, cpu), max_load);
+		if (old_max_load)
+			kfree_rcu(old_max_load, rcu);
+	}
+
+	spin_unlock_irqrestore(&freq_max_load_lock, flags);
+	return 0;
+
+fail:
+	for_each_cpu(cpu, cpumask) {
+		max_load = rcu_dereference(per_cpu(freq_max_load, cpu));
+		if (max_load) {
+			rcu_assign_pointer(per_cpu(freq_max_load, cpu), NULL);
+			kfree_rcu(max_load, rcu);
+		}
+	}
+
+	spin_unlock_irqrestore(&freq_max_load_lock, flags);
+	return ret;
+}
 static void update_task_cpu_cycles(struct task_struct *p, int cpu)
 {
 	if (use_cycle_counter)
