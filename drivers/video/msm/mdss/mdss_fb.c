@@ -88,11 +88,17 @@
  */
 #define MDP_TIME_PERIOD_CALC_FPS_US	1000000
 
+
 #define MDSS_BRIGHT_TO_BL_DIM(out, v) do {\
-			out = ((v) * (v) * 255  / 7000 + (v) * (255 - (v)) / 32);\
-			} while (0)
+		out = ((v) * (v) * 255  / 7000 + (v) * (255 - (v)) / 32);\
+		} while (0)
+
 bool backlight_dimmer = false;
-module_param(backlight_dimmer, bool, 0755);
+int backlight_min = 1;
+int backlight_max = 255;
+module_param(backlight_dimmer, bool, 0644);
+module_param(backlight_min, int, 0644);
+module_param(backlight_max, int, 0644);
 
 static struct fb_info *fbi_list[MAX_FBI_LIST];
 static int fbi_list_index;
@@ -331,10 +337,33 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
 
-	/* This maps android backlight level 0 to 255 into
-	   driver backlight level 0 to bl_max with rounding */
-	MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
+	if (value != 0)
+	{
+		/* sanitize */
+		if (backlight_min < 1)
+			backlight_min = 1;
+		if (backlight_max < 255)
+			backlight_max= 255;
+
+		/* set limits */
+		if (value < backlight_min)
+			value = backlight_min;
+		if (value > backlight_max)
+			value = backlight_max;
+	}
+
+	if (backlight_dimmer) {
+		if(value < 3) {
+			bl_lvl = 1;
+		} else {
+			MDSS_BRIGHT_TO_BL_DIM(bl_lvl, value);
+		}
+	} else {
+		/* This maps android backlight level 0 to 255 into
+	 	  driver backlight level 0 to bl_max with rounding */
+		MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
 				mfd->panel_info->brightness_max);
+	}
 
 	if (!bl_lvl && value)
 		bl_lvl = 1;
@@ -547,14 +576,9 @@ static void __mdss_fb_idle_notify_work(struct work_struct *work)
 
 	/* Notify idle-ness here */
 	pr_debug("Idle timeout %dms expired!\n", mfd->idle_time);
-	mfd->idle_state = MDSS_FB_IDLE;
-	/*
-	 * idle_notify node events are used to reduce MDP load when idle,
-	 * this is not needed for command mode panels.
-	 */
-	if (mfd->idle_time && mfd->panel.type != MIPI_CMD_PANEL)
+	if (mfd->idle_time)
 		sysfs_notify(&mfd->fbi->dev->kobj, NULL, "idle_notify");
-	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "idle_state");
+	mfd->idle_state = MDSS_FB_IDLE;
 }
 
 
@@ -618,26 +642,6 @@ static ssize_t mdss_fb_get_idle_notify(struct device *dev,
 	return ret;
 }
 
-static ssize_t mdss_fb_get_idle_state(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct msm_fb_data_type *mfd = fbi->par;
-	const char *state_strs[] = {
-		[MDSS_FB_NOT_IDLE] = "active",
-		[MDSS_FB_IDLE_TIMER_RUNNING] = "pending",
-		[MDSS_FB_IDLE] = "idle",
-	};
-	int state = mfd->idle_state;
-	const char *s;
-	if (state < ARRAY_SIZE(state_strs) && state_strs[state])
-		s = state_strs[state];
-	else
-		s = "invalid";
-
-	return scnprintf(buf, PAGE_SIZE, "%s\n", s);
-}
-
 static ssize_t mdss_fb_get_panel_info(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -657,7 +661,8 @@ static ssize_t mdss_fb_get_panel_info(struct device *dev,
 			"white_chromaticity_x=%d\nwhite_chromaticity_y=%d\n"
 			"red_chromaticity_x=%d\nred_chromaticity_y=%d\n"
 			"green_chromaticity_x=%d\ngreen_chromaticity_y=%d\n"
-			"blue_chromaticity_x=%d\nblue_chromaticity_y=%d\n",
+			"blue_chromaticity_x=%d\nblue_chromaticity_y=%d\n"
+			"panel_orientation=%d\n",
 			pinfo->partial_update_enabled,
 			pinfo->roi_alignment.xstart_pix_align,
 			pinfo->roi_alignment.width_pix_align,
@@ -680,7 +685,8 @@ static ssize_t mdss_fb_get_panel_info(struct device *dev,
 			pinfo->hdr_properties.display_primaries[4],
 			pinfo->hdr_properties.display_primaries[5],
 			pinfo->hdr_properties.display_primaries[6],
-			pinfo->hdr_properties.display_primaries[7]);
+			pinfo->hdr_properties.display_primaries[7],
+			pinfo->panel_orientation);
 
 	return ret;
 }
@@ -957,7 +963,6 @@ static DEVICE_ATTR(show_blank_event, S_IRUGO, mdss_mdp_show_blank_event, NULL);
 static DEVICE_ATTR(idle_time, S_IRUGO | S_IWUSR | S_IWGRP,
 	mdss_fb_get_idle_time, mdss_fb_set_idle_time);
 static DEVICE_ATTR(idle_notify, S_IRUGO, mdss_fb_get_idle_notify, NULL);
-static DEVICE_ATTR(idle_state, S_IRUGO, mdss_fb_get_idle_state, NULL);
 static DEVICE_ATTR(msm_fb_panel_info, S_IRUGO, mdss_fb_get_panel_info, NULL);
 static DEVICE_ATTR(msm_fb_src_split_info, S_IRUGO, mdss_fb_get_src_split_info,
 	NULL);
@@ -977,7 +982,6 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_show_blank_event.attr,
 	&dev_attr_idle_time.attr,
 	&dev_attr_idle_notify.attr,
-	&dev_attr_idle_state.attr,
 	&dev_attr_msm_fb_panel_info.attr,
 	&dev_attr_msm_fb_src_split_info.attr,
 	&dev_attr_msm_fb_thermal_level.attr,
@@ -1766,9 +1770,6 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 		mfd->unset_bl_level = U32_MAX;
 	}
 
-	if (mdss_fb_is_power_on_interactive(mfd) && mfd->bl_level)
-		mfd->unblank_bl_level = mfd->bl_level;
-
 	pdata = dev_get_platdata(&mfd->pdev->dev);
 
 	if ((pdata) && (pdata->set_backlight)) {
@@ -1844,7 +1845,7 @@ static int mdss_fb_start_disp_thread(struct msm_fb_data_type *mfd)
 	mdss_fb_get_split(mfd);
 
 	atomic_set(&mfd->commits_pending, 0);
-	mfd->disp_thread = kthread_run_perf_critical(__mdss_fb_display_thread,
+	mfd->disp_thread = kthread_run(__mdss_fb_display_thread,
 				mfd, "mdss_fb%d", mfd->index);
 
 	if (IS_ERR(mfd->disp_thread)) {
@@ -2019,9 +2020,7 @@ static int mdss_fb_blank_unblank(struct msm_fb_data_type *mfd)
 			 * the backlight would remain 0 (0 is set in blank).
 			 * Hence resetting back to calibration mode value
 			 */
-			if (!IS_CALIB_MODE_BL(mfd))
-				mdss_fb_set_backlight(mfd, mfd->unblank_bl_level);
-			else
+			if (IS_CALIB_MODE_BL(mfd))
 				mdss_fb_set_backlight(mfd, mfd->calib_mode_bl);
 			else if ((!mfd->panel_info->mipi.post_init_delay) &&
 				(mfd->unset_bl_level != U32_MAX))
@@ -3191,18 +3190,14 @@ static int __mdss_fb_sync_buf_done_callback(struct notifier_block *p,
 			ret = __mdss_fb_wait_for_fence_sub(sync_pt_data,
 				sync_pt_data->temp_fen, fence_cnt);
 		}
-		if (mfd->idle_time) {
-			if (!mod_delayed_work(system_wq,
+		if (mfd->idle_time && !mod_delayed_work(system_wq,
 					&mfd->idle_notify_work,
 					msecs_to_jiffies(mfd->idle_time)))
-				pr_debug("fb%d: restarted idle work\n",
-						mfd->index);
-			mfd->idle_state = MDSS_FB_IDLE_TIMER_RUNNING;
-		} else {
-			mfd->idle_state = MDSS_FB_IDLE;
-		}
+			pr_debug("fb%d: restarted idle work\n",
+					mfd->index);
 		if (ret == -ETIME)
 			ret = NOTIFY_BAD;
+		mfd->idle_state = MDSS_FB_IDLE_TIMER_RUNNING;
 		break;
 	case MDP_NOTIFY_FRAME_FLUSHED:
 		pr_debug("%s: frame flushed\n", sync_pt_data->fence_name);
@@ -3460,7 +3455,7 @@ int mdss_fb_atomic_commit(struct fb_info *info,
 	struct mdp_layer_commit_v1 *commit_v1;
 	struct mdp_output_layer *output_layer;
 	struct mdss_panel_info *pinfo;
-	bool wait_for_finish, wb_change = false;
+	bool wait_for_finish, update = false, wb_change = false;
 	int ret = -EPERM;
 	u32 old_xres, old_yres, old_format;
 
@@ -3512,6 +3507,7 @@ int mdss_fb_atomic_commit(struct fb_info *info,
 						output_layer->buffer.width,
 						output_layer->buffer.height,
 						output_layer->buffer.format);
+					update = true;
 				}
 			}
 			ret = mfd->mdp.atomic_validate(mfd, file, commit_v1);
@@ -3552,7 +3548,7 @@ int mdss_fb_atomic_commit(struct fb_info *info,
 		ret = mdss_fb_pan_idle(mfd);
 
 end:
-	if (ret && (mfd->panel.type == WRITEBACK_PANEL) && wb_change)
+	if (update && ret && (mfd->panel.type == WRITEBACK_PANEL) && wb_change)
 		mdss_fb_update_resolution(mfd, old_xres, old_yres, old_format);
 	return ret;
 }
