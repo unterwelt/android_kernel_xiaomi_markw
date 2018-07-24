@@ -656,13 +656,14 @@ static void get_speed_bin(struct platform_device *pdev, int *bin,
 	void __iomem *base;
 	u32 pte_efuse;
 
+	// Enforce speedbin0 coz why not
 	*bin = 0;
 	*version = 0;
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "efuse");
 	if (!res) {
-		dev_info(&pdev->dev,
-			 "No speed/PVS binning available. Defaulting to 0!\n");
+		dev_info(&pdev->dev, "Speed bin: %d PVS Version: %d\n", *bin,
+									*version);
 		return;
 	}
 

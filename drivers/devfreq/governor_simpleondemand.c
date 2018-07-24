@@ -160,4 +160,3 @@ static void __exit devfreq_simple_ondemand_exit(void)
 }
 module_exit(devfreq_simple_ondemand_exit);
 MODULE_LICENSE("GPL");
-
